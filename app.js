@@ -1380,7 +1380,7 @@ function customProfileFormHTML(){
         <span>${escapeHTML(customProfileSummary())}</span>
       </div>
       <div class="custom-form-grid">
-        <label>Prénom <input type="text" value="${escapeHTML(c.name)}" placeholder="Optionnel" oninput="saveCustomProfileField('name',this.value)"></label>
+        <label>Pseudo <input type="text" value="${escapeHTML(c.name)}" placeholder="Ton pseudo" oninput="saveCustomProfileField('name',this.value)"></label>
         <label>Âge <input type="number" min="12" max="90" value="${escapeHTML(c.age)}" placeholder="38" oninput="saveCustomProfileField('age',this.value)"></label>
         <label>Poids <input type="number" min="30" max="200" value="${escapeHTML(c.weight)}" placeholder="72" oninput="saveCustomProfileField('weight',this.value)"></label>
         <label>Taille <input type="number" min="120" max="230" value="${escapeHTML(c.height)}" placeholder="178" oninput="saveCustomProfileField('height',this.value)"></label>
@@ -1459,7 +1459,7 @@ function renderChoices(){
 
   if(levelBox)levelBox.innerHTML=levelHTML;
   if(modeBox)modeBox.innerHTML=`
-    ${customProfileFormHTML()}
+    ${profile.level==='perso'?customProfileFormHTML():''}
     <div class="setup-label full-label">Matériel disponible</div>
     ${equipmentChoicesHTML()}
   `;
@@ -2094,7 +2094,7 @@ function renderOptions(){
 
     <div class="setup-label" style="padding-left:12px">Niveau</div>
     <div style="padding:0 12px" class="choice-grid">${levelHTML}</div>
-    <div style="padding:0 12px">${customProfileFormHTML()}</div>
+    ${profile.level==='perso'?'<div style="padding:0 12px">'+customProfileFormHTML()+'</div>':''}
 
     <div class="setup-label" style="padding-left:12px">Minuteur</div>
     <div style="padding:0 12px" class="choice-grid">
@@ -2480,9 +2480,13 @@ function renderInfo(){
   const info=currentDaySessionInfo();
   const progress=pct(currentDay);
   const restDay=!info.total;
+  if(restDay){
+    document.getElementById('day-info-card').innerHTML=programHeroHTML();
+    return;
+  }
   document.getElementById('day-info-card').innerHTML=
     programHeroHTML()+
-    `<div class="card day-detail-card ${restDay?'rest-day-card':''}"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" onclick="resetDay()">Reset</button></div><div class="prog-row"><span class="prog-label">${restDay?'Repos':'Progression'}</span><span class="prog-pct">${restDay?'neutre':progress+'%'}</span></div><div class="prog-track"><div class="prog-fill" style="width:${restDay?100:progress}%"></div></div>${sessionStatusHTML()}${sessionPlanHTML()}</div>`;
+    `<div class="card day-detail-card"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" onclick="resetDay()">Reset</button></div><div class="prog-row"><span class="prog-label">Progression</span><span class="prog-pct">${progress}%</span></div><div class="prog-track"><div class="prog-fill" style="width:${progress}%"></div></div>${sessionStatusHTML()}${sessionPlanHTML()}</div>`;
 }
 
 function circuitHTML(ex){
