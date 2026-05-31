@@ -1256,6 +1256,7 @@ function saveHistory(list){
   storageSafe.setItem('vv-history',JSON.stringify(list.slice(-120)));
 }
 function logExerciseDone(ex){
+  if(!ex || ex.type==='repos')return;
   const list=getHistory();
   list.push({
     date:todayKey(),
@@ -1273,6 +1274,7 @@ function statsSummary(){
   const byDate={};
   let exercises=0, minutes=0;
   list.forEach(x=>{
+    if((x.exercise||'').toLowerCase()==='repos')return;
     byDate[x.date]=(byDate[x.date]||0)+1;
     exercises++;
     minutes+=x.minutes||2;
@@ -1554,7 +1556,7 @@ function getDone(ex,day=currentDay){return storageSafe.getItem('done-'+key(ex,da
 function setDone(ex,v,opts={},day=currentDay){
   const was=getDone(ex,day);
   storageSafe.setItem('done-'+key(ex,day),v?'1':'0');
-  if(v&&!was)logExerciseDone(ex);
+  if(v&&!was&&ex.type!=='repos')logExerciseDone(ex);
   if(!opts.silent){
     renderAll();
     saveAppState();
@@ -1562,7 +1564,11 @@ function setDone(ex,v,opts={},day=currentDay){
 }
 function getNote(ex,day=currentDay){return storageSafe.getItem('note-'+key(ex,day))||''}
 function setNote(ex,v,day=currentDay){storageSafe.setItem('note-'+key(ex,day),v)}
-function pct(day){const ex=P()[day].exercises;if(!ex.length)return 0;return Math.round(ex.filter(e=>storageSafe.getItem('done-'+profile.level+'-'+profile.mode+'-'+day+'-'+e.name)==='1').length/ex.length*100)}
+function pct(day){
+  const ex=P()[day].exercises.filter(e=>e.type!=='repos');
+  if(!ex.length)return 0;
+  return Math.round(ex.filter(e=>storageSafe.getItem('done-'+profile.level+'-'+profile.mode+'-'+day+'-'+e.name)==='1').length/ex.length*100);
+}
 
 
 function getTimerExerciseOptions(){
@@ -2028,7 +2034,8 @@ function renderExercises(){
   list.innerHTML=prog[currentDay].exercises.map((ex,i)=>{
     const visualKey=chooseExerciseVisual(ex);
     const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
-    return `<div class="ex-card ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="Valider l’exercice" aria-label="Valider l’exercice" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div><div class="ex-meta"><strong>Cible :</strong> ${ex.target}<br><strong>Comment faire :</strong> ${ex.how}<br><strong>Conseil :</strong> ${ex.tips}</div>${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
+    const checkLabel=ex.type==='repos'?'Valider le repos':'Valider l’exercice';
+    return `<div class="ex-card ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div><div class="ex-meta"><strong>Cible :</strong> ${ex.target}<br><strong>Comment faire :</strong> ${ex.how}<br><strong>Conseil :</strong> ${ex.tips}</div>${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
   }).join('');
 }
 

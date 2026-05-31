@@ -1,4 +1,4 @@
-const CACHE_NAME='vv-sport-exercises-profile-timer-v10';
+const CACHE_NAME='vv-sport-exercises-profile-timer-v11';
 const ASSETS=[
   './',
   './index.html',
