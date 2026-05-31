@@ -1,0 +1,90 @@
+AUDIT COMPLET FINAL vV Sport
+
+Correctifs / optimisations:
+- HTML corrigé : launch-screen replacé après <body>, plus rien avant <!DOCTYPE>.
+- showProfileSetup corrigé : utilise app-screen et ouvre bien le choix profil.
+- Accueil : Commencer et Modifier le profil ouvrent le choix profil.
+- currentTab initialisé proprement après storageSafe.
+- showTab renforcé : active/hidden/display + sync activeTab/currentTab.
+- saveAppState sauvegarde currentTab.
+- restoreAppState restaure currentTab correctement.
+- renderChoices corrigé : desc/sub sécurisé, plus undefined.
+- renderOptions corrigé : desc/sub sécurisé.
+- Navigation : tous les onglets inclus.
+- HTML navigation : data-tab et tab-page vérifiés.
+- Binding navigation robuste.
+- Libellé matériel nettoyé : uniquement Matériel disponible.
+- options-content vérifié dans l’onglet Options.
+- Helpers statut séance terminée vérifiés.
+- Carte séance terminée consolidée.
+- Démarrage séance complète neutralisé.
+- CSS onglets/navigation/statut terminé vérifié.
+- Tests internes complets consolidés.
+- boot vérifié : binding navigation actif.
+- Cache PWA versionné v78.
+
+Rapport:
+✅ Fichier présent : index.html
+✅ Fichier présent : styles.css
+✅ Fichier présent : app.js
+✅ Fichier présent : manifest.webmanifest
+✅ Fichier présent : sw.js
+✅ Fichier présent : icon-192.svg
+✅ Fichier présent : icon-512.svg
+✅ Fichier présent : sound-start.wav
+✅ Fichier présent : sound-count.wav
+✅ Fichier présent : sound-rest.wav
+✅ Fichier présent : sound-done.wav
+✅ Fichier présent : README.md
+✅ HTML commence par DOCTYPE
+✅ Structure HTML body/html OK
+✅ launch-screen est dans le body
+✅ Références HTML locales OK
+✅ Syntaxe JavaScript OK
+✅ Test runtime complet OK
+✅ Toutes les fonctions onclick détectées sont définies
+✅ Libellés connus nettoyés
+✅ Fonctionnalité OK : HTML propre
+✅ Fonctionnalité OK : Profil sans undefined
+✅ Fonctionnalité OK : Commencer ouvre profil
+✅ Fonctionnalité OK : Navigation robuste
+✅ Fonctionnalité OK : Options isolées
+✅ Fonctionnalité OK : Matériel disponible unique
+✅ Fonctionnalité OK : Vélo programme + visuel
+✅ Fonctionnalité OK : Visuels avancés
+✅ Fonctionnalité OK : Coche cartes
+✅ Fonctionnalité OK : Statut terminé
+✅ Fonctionnalité OK : Minuteur
+✅ Fonctionnalité OK : Audio
+✅ Fonctionnalité OK : Cache v78
+✅ Service worker référence : index.html
+✅ Service worker référence : styles.css
+✅ Service worker référence : app.js
+✅ Service worker référence : manifest.webmanifest
+
+Issues restantes:
+Aucune
+
+Warnings:
+Aucun
+
+Fonctions onclick:
+handleCheckClick, resetDay, resetWeek, restartCurrentTimer, resumeFromLaunch, saveProfileAndEnter, selectLevel, setManualTimer, showProfileSetup, showTab, startSelectedTimerExercise, startTodaySession, stopGuidedSession, toggleCard, toggleEquipment, toggleSoundOption, toggleTimer, validateTimerExercise
+
+Hashes:
+AUDIT.txt: 3e23ddcd341d6e45
+README.md: b97c3ac5ce68b810
+VISUAL_AUDIT.txt: 4e9f4d7548aaf5dc
+app.js: 32e3d69faa1aae06
+debug_visual.js: 30b5e29001983b15
+icon-192.svg: 4ab0e135a0d7dfd2
+icon-512.svg: 4ab0e135a0d7dfd2
+index.html: 9beed1fecd068e06
+manifest.webmanifest: 33927b1fe02fa0a8
+sound-count.wav: 85fd4467d4e5bd5a
+sound-done.wav: 95abd69894228532
+sound-rest.wav: bab23e71b9f055de
+sound-start.wav: 1a36eace6a455ef5
+styles.css: b409687b985cac77
+sw.js: 72817fb51e292305
+visuals_contact_sheet.png: 1b9ea0c407a9dedf

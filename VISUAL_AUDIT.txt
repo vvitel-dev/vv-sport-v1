@@ -1,0 +1,15 @@
+AUDIT VISUEL vV Sport
+
+Constats corrigés:
+- Plusieurs exercices avaient un bon mapping via chooseExerciseVisual mais renderExercises utilisait ex.svg directement.
+- Certains exercices apparaissaient donc avec le bonhomme par défaut au lieu du bon mouvement.
+- Rowing aux anneaux ne matchait pas ring_row.
+- Dips anneaux utilisaient un visuel anneaux trop générique.
+- Support hold sur supports utilisait une planche/gainage, pas un maintien sur supports.
+- Rowing haltères utilisait un rowing inversé.
+- Mobilité épaules pouvait utiliser un étirement dos au lieu d’une mobilité épaules.
+
+Correctifs:
+- Nouveau rendu avec data-visual et chooseExerciseVisual.
+- Ajout SVG/animations: circuit, db_row, support_hold, ring_dip.
+- Test runtime __testVisualMappings.

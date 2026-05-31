@@ -1,0 +1,17 @@
+AUDIT DOUBLON OPTIONS vV Sport
+
+Correctifs:
+- Bloc tab-options remplacé par un conteneur unique options-content.
+- CSS anti-doublon Options ajouté.
+- Test interne anti-doublon Options ajouté.
+- Cache PWA versionné v80.
+
+Rapport:
+✅ Un seul options-content dans HTML
+✅ tab-options contient uniquement options-content
+✅ Syntaxe JavaScript OK
+✅ Test runtime Options sans doublon OK
+✅ Cache v80 OK
+
+Issues restantes:
+Aucune
