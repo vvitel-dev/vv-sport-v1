@@ -21,6 +21,10 @@ textarea:focus-visible{
   outline-offset:2px;
 }
 .day-scroller{display:flex;gap:6px;overflow-x:auto;padding:12px 16px;scrollbar-width:none}.day-scroller::-webkit-scrollbar{display:none}
+.program-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0 16px 8px;padding:4px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface)}
+.program-switch-btn{min-height:40px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer}
+.program-switch-btn.active{background:var(--accent-dim);color:var(--accent)}
+.program-view.hidden{display:none!important}
 .day-chip{flex-shrink:0;padding:6px 14px;border-radius:999px;border:1px solid var(--border2);background:transparent;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);font-family:var(--font);transition:all .15s;position:relative}
 .day-chip.active{background:var(--accent);color:#111;border-color:var(--accent)}
 .card{margin:0 12px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
@@ -45,7 +49,7 @@ textarea:focus-visible{
 .start-btn{width:100%;padding:13px;border-radius:var(--r-sm);border:none;background:var(--accent-dim);color:var(--accent);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;transition:all .15s}.start-btn.running{background:var(--accent);color:#111}.start-btn:active{transform:scale(.98)}
 .preset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}.preset-btn{padding:9px 4px;border:1px solid var(--border2);border-radius:var(--r-sm);background:transparent;font-size:12px;color:var(--muted);cursor:pointer;font-family:var(--mono);transition:all .15s}
 .tip-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}.tip-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}.tip-row:last-child{border:none}.tip-row span:last-child{font-family:var(--mono);color:var(--accent);font-size:12px}
-#tab-week{padding:0 12px}.week-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:4px}.week-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}.week-card.today{border-color:var(--accent)}.wday{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--hint)}.wtitle{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3}.wpct{font-size:22px;font-weight:600;font-family:var(--mono);color:var(--ink);margin-top:8px}.wpct.full{color:var(--accent)}.week-prog-track{height:3px;background:var(--surface2);border-radius:999px;overflow:hidden;margin-top:4px}.week-prog-fill{height:100%;background:var(--accent);border-radius:999px}.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;margin-top:6px;font-weight:500}.badge-done{background:rgba(200,240,96,.15);color:var(--accent)}.badge-partial{background:rgba(240,160,48,.12);color:var(--amber)}.badge-rest{background:var(--surface2);color:var(--hint)}
+#program-week{padding:0 12px}.week-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:4px}.week-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}.week-card.today{border-color:var(--accent)}.wday{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--hint)}.wtitle{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3}.wpct{font-size:22px;font-weight:600;font-family:var(--mono);color:var(--ink);margin-top:8px}.wpct.full{color:var(--accent)}.week-prog-track{height:3px;background:var(--surface2);border-radius:999px;overflow:hidden;margin-top:4px}.week-prog-fill{height:100%;background:var(--accent);border-radius:999px}.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;margin-top:6px;font-weight:500}.badge-done{background:rgba(200,240,96,.15);color:var(--accent)}.badge-partial{background:rgba(240,160,48,.12);color:var(--amber)}.badge-rest{background:var(--surface2);color:var(--hint)}
 .section-label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--hint);font-weight:500;margin:16px 0 8px}
 .profile-pill{display:inline-flex;gap:6px;align-items:center;margin-top:8px;padding:5px 9px;border-radius:999px;background:var(--surface2);color:var(--accent);font-size:11px;font-family:var(--mono)}
 
@@ -1539,15 +1543,15 @@ body{
 }
 
 /* HARD FIX tabs isolation v81 */
-#tab-today:not(.active),
-#tab-week:not(.active),
+#tab-program:not(.active),
+#tab-exercises:not(.active),
 #tab-timer:not(.active),
 #tab-stats:not(.active),
 #tab-options:not(.active){
   display:none!important;
 }
-#tab-today.active,
-#tab-week.active,
+#tab-program.active,
+#tab-exercises.active,
 #tab-timer.active,
 #tab-stats.active,
 #tab-options.active{

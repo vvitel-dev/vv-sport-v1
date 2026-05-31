@@ -47,16 +47,21 @@
 </div>
 
 <main id="app-screen" class="hidden">
-  <div id="tab-today" class="tab-page">
-    <div class="page-header"><div class="page-title">vV Sport</div><div class="page-sub">Musculation · Calisthénie · Abdos</div><div class="profile-pill" id="profile-pill"></div></div>
-    <div class="day-scroller" id="day-scroller"></div>
-    <div id="day-info-card"></div>
-    <div id="exercise-list"></div>
-  </div>
-  <div id="tab-week" class="hidden tab-page" style="display:none">
-    <div class="page-header"><div class="page-title">Semaine</div><div class="page-sub">Vue d'ensemble hebdomadaire</div></div>
-    <div class="section-label">Progression</div><div class="week-grid" id="week-grid"></div>
-    <div class="week-reset-row"><button class="reset-btn reset-btn-large" type="button" onclick="resetWeek()">Réinitialiser toute la semaine</button></div>
+  <div id="tab-program" class="tab-page active">
+    <div class="page-header"><div class="page-title">Programme</div><div class="page-sub">Aujourd’hui · Semaine</div><div class="profile-pill" id="profile-pill"></div></div>
+    <div class="program-switch" role="tablist" aria-label="Vue du programme">
+      <button class="program-switch-btn active" id="program-view-today" type="button" onclick="showProgramView('today')">Aujourd’hui</button>
+      <button class="program-switch-btn" id="program-view-week" type="button" onclick="showProgramView('week')">Semaine</button>
+    </div>
+    <section id="program-today" class="program-view active">
+      <div class="day-scroller" id="day-scroller"></div>
+      <div id="day-info-card"></div>
+      <div id="exercise-list"></div>
+    </section>
+    <section id="program-week" class="program-view hidden" hidden style="display:none">
+      <div class="section-label">Progression</div><div class="week-grid" id="week-grid"></div>
+      <div class="week-reset-row"><button class="reset-btn reset-btn-large" type="button" onclick="resetWeek()">Réinitialiser toute la semaine</button></div>
+    </section>
   </div>
   <div id="tab-exercises" class="hidden tab-page" style="display:none">
     <div class="page-header"><div class="page-title">Exercices</div><div class="page-sub">Bibliothèque complète · lancer un exercice seul</div></div>
@@ -152,8 +157,7 @@
   <div id="options-content"></div>
 </section>
 <nav class="tab-bar" aria-label="Navigation principale">
-    <button class="tab-btn active" id="tbtn-today" data-tab="today" type="button" aria-controls="tab-today" aria-current="page">Aujourd'hui</button>
-    <button class="tab-btn" id="tbtn-week" data-tab="week" type="button" aria-controls="tab-week">Semaine</button>
+    <button class="tab-btn active" id="tbtn-program" data-tab="program" type="button" aria-controls="tab-program" aria-current="page">Programme</button>
     <button class="tab-btn" id="tbtn-exercises" data-tab="exercises" type="button" aria-controls="tab-exercises">Exercices</button>
     <button class="tab-btn" id="tbtn-timer" data-tab="timer" type="button" aria-controls="tab-timer">Minuteur</button>
     <button class="tab-btn" id="tbtn-stats" data-tab="stats" type="button" aria-controls="tab-stats">Stats</button>

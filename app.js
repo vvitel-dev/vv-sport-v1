@@ -23,7 +23,12 @@ const storageSafe = {
     }
   }
 };
-let currentTab=storageSafe.getItem('vv-current-tab')||'today';
+let currentTab=storageSafe.getItem('vv-current-tab')||'program';
+let programView=storageSafe.getItem('vv-program-view')||'today';
+if(currentTab==='today'||currentTab==='week'){
+  programView=currentTab;
+  currentTab='program';
+}
 
 
 window.addEventListener('error',
@@ -1420,6 +1425,7 @@ function saveAppState(){
     const state={
       currentDay,
       activeTab:currentTab,
+      programView,
       timer:{
         seconds:timer.seconds,
         left:timer.left,
@@ -1477,7 +1483,8 @@ function restoreAppState(){
   if(!state)return false;
 
   currentDay=state.currentDay || getRealDay();
-  currentTab=state.activeTab || state.currentTab || 'today';
+  programView=state.programView || programView || 'today';
+  currentTab=normalizeTabTarget(state.activeTab || state.currentTab || 'program');
   if(typeof activeTab!=='undefined')activeTab=currentTab;
 
   if(state.timer){
@@ -2195,7 +2202,7 @@ function resetWeek(){
   renderAll();
   saveAppState();
 }
-function renderWeek(){const grid=document.getElementById('week-grid');if(!grid)return;grid.innerHTML=DAYS.map(d=>{const p=pct(d);return `<div class="week-card ${d===currentDay?'today':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);showTab('today');renderAll()"><div class="wday">${d}</div><div class="wtitle">${P()[d].title}</div><div class="wpct ${p===100?'full':''}">${p}%</div><div class="week-prog-track"><div class="week-prog-fill" style="width:${p}%"></div></div><span class="badge ${p===100?'badge-done':p>0?'badge-partial':'badge-rest'}">${p===100?'fait':p>0?'en cours':'à faire'}</span></div>`}).join('')}
+function renderWeek(){const grid=document.getElementById('week-grid');if(!grid)return;grid.innerHTML=DAYS.map(d=>{const p=pct(d);return `<div class="week-card ${d===currentDay?'today':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);showProgramView('today');renderAll()"><div class="wday">${d}</div><div class="wtitle">${P()[d].title}</div><div class="wpct ${p===100?'full':''}">${p}%</div><div class="week-prog-track"><div class="week-prog-fill" style="width:${p}%"></div></div><span class="badge ${p===100?'badge-done':p>0?'badge-partial':'badge-rest'}">${p===100?'fait':p>0?'en cours':'à faire'}</span></div>`}).join('')}
 
 function bindNavigationTabs(){
   document.querySelectorAll('[data-tab]').forEach(btn=>{
@@ -2211,7 +2218,39 @@ function bindNavigationTabs(){
 }
 
 function getTabPageNames(){
-  return ['today','week','exercises','timer','stats','options'];
+  return ['program','exercises','timer','stats','options'];
+}
+
+function normalizeTabTarget(t){
+  if(t==='today'||t==='week'){
+    programView=t;
+    storageSafe.setItem('vv-program-view',programView);
+    return 'program';
+  }
+  return t;
+}
+
+function showProgramView(view){
+  programView=view==='week'?'week':'today';
+  storageSafe.setItem('vv-program-view',programView);
+
+  ['today','week'].forEach(name=>{
+    const panel=document.getElementById('program-'+name);
+    const btn=document.getElementById('program-view-'+name);
+    const active=name===programView;
+    if(panel){
+      panel.classList.toggle('active',active);
+      panel.classList.toggle('hidden',!active);
+      panel.hidden=!active;
+      panel.style.display=active?'block':'none';
+    }
+    if(btn){
+      btn.classList.toggle('active',active);
+      btn.setAttribute('aria-selected',active?'true':'false');
+    }
+  });
+
+  if(currentTab!=='program')showTab('program');
 }
 
 
@@ -2248,7 +2287,8 @@ function ensureStatsTab(){
 function showTab(t){
   ensureStatsTab();
   const tabNames=getTabPageNames();
-  currentTab=tabNames.includes(t)?t:'today';
+  const normalized=normalizeTabTarget(t);
+  currentTab=tabNames.includes(normalized)?normalized:'program';
   if(typeof activeTab!=='undefined')activeTab=currentTab;
 
   tabNames.forEach(name=>{
@@ -2275,6 +2315,7 @@ function showTab(t){
   }
   if(currentTab==='stats' && typeof renderStats==='function')renderStats();
   if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
+  if(currentTab==='program')showProgramView(programView);
 
   if(typeof bindNavigationTabs==='function')bindNavigationTabs();
   storageSafe.setItem('vv-current-tab',currentTab);
@@ -3261,7 +3302,7 @@ function __testTabIsolation(){
   const setupMaterial=document.getElementById('mode-choices').innerHTML;
 
   showTab('week');
-  const activeWeek=document.getElementById('tab-week') ? document.getElementById('tab-week').classList.contains('active') : true;
+  const activeWeek=document.getElementById('tab-program') ? document.getElementById('tab-program').classList.contains('active') && programView==='week' : true;
 
   showTab('options');
   const activeOptions=document.getElementById('tab-options') ? document.getElementById('tab-options').classList.contains('active') : true;
