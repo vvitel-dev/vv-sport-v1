@@ -221,6 +221,11 @@ textarea:focus-visible{
   font-size:11px;
   color:var(--accent);
 }
+.chart-value.is-rest{
+  font-family:var(--sans);
+  font-size:9px;
+  color:var(--muted);
+}
 .chart-track{
   position:relative;
   display:flex;
@@ -239,6 +244,10 @@ textarea:focus-visible{
 }
 .chart-bar.is-empty{
   background:rgba(255,255,255,.12);
+  box-shadow:none;
+}
+.chart-bar.is-rest{
+  background:linear-gradient(180deg,rgba(148,163,184,.36),rgba(148,163,184,.16));
   box-shadow:none;
 }
 .chart-label{

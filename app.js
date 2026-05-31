@@ -1247,7 +1247,28 @@ function saveProfileAndEnter(){
 }
 
 function todayKey(){
-  return new Date().toISOString().slice(0,10);
+  return dateKey(new Date());
+}
+function dateKey(date){
+  const y=date.getFullYear();
+  const m=String(date.getMonth()+1).padStart(2,'0');
+  const d=String(date.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+d;
+}
+function dateFromKey(key){
+  const parts=String(key||'').split('-');
+  if(parts.length!==3)return new Date();
+  return new Date(Number(parts[0]),Number(parts[1])-1,Number(parts[2]));
+}
+function programDayForDate(date){
+  return DAYS[(date.getDay()+6)%7] || 'Lundi';
+}
+function isRestProgramDay(dayName){
+  const day=P()[dayName];
+  return dayName==='Dimanche' || !!(day && day.exercises && day.exercises.length && day.exercises.every(ex=>ex.type==='repos'));
+}
+function isRestDateKey(key){
+  return isRestProgramDay(programDayForDate(dateFromKey(key)));
 }
 function getHistory(){
   try{return JSON.parse(storageSafe.getItem('vv-history')||'[]')}catch(e){return[]}
@@ -1283,8 +1304,9 @@ function statsSummary(){
   let streak=0;
   const d=new Date();
   for(let i=0;i<60;i++){
-    const key=d.toISOString().slice(0,10);
+    const key=dateKey(d);
     if(byDate[key]){streak++;d.setDate(d.getDate()-1)}
+    else if(isRestDateKey(key)){d.setDate(d.getDate()-1)}
     else break;
   }
   return {list,byDate,sessions,exercises,minutes,streak};
@@ -1316,9 +1338,7 @@ function escapeHTML(v){
   return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});
 }
 function formatHistoryDate(key){
-  const parts=String(key||'').split('-');
-  if(parts.length!==3)return key||'—';
-  const d=new Date(Number(parts[0]),Number(parts[1])-1,Number(parts[2]));
+  const d=dateFromKey(key);
   try{return d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}catch(e){return key;}
 }
 function formatChartDay(date){
@@ -1358,22 +1378,25 @@ function renderStats(){
   for(let i=6;i>=0;i--){
     const x=new Date(d);
     x.setDate(d.getDate()-i);
-    const k=x.toISOString().slice(0,10);
-    days.push({k,v:s.byDate[k]||0});
+    const k=dateKey(x);
+    days.push({k,v:s.byDate[k]||0,rest:isRestProgramDay(programDayForDate(x))});
   }
   const max=Math.max(1,...days.map(x=>x.v));
   const total7=days.reduce((sum,x)=>sum+x.v,0);
+  const rest7=days.filter(x=>x.rest).length;
   if(chart)chart.innerHTML=`
     <div class="chart-top">
       <div><strong>${total7}</strong><span>exercice${total7>1?'s':''}</span></div>
-      <small>max ${max}/jour</small>
+      <small>${rest7?rest7+' repos · ':''}max ${max}/jour</small>
     </div>
     <div class="chart-bars">
       ${days.map(x=>{
-        const parts=x.k.split('-');
-        const date=new Date(Number(parts[0]),Number(parts[1])-1,Number(parts[2]));
+        const date=dateFromKey(x.k);
         const h=x.v ? Math.max(18,Math.round((x.v/max)*86)) : 6;
-        return '<div class="chart-day" title="'+escapeHTML(x.k)+' · '+x.v+' exercice(s)"><span class="chart-value">'+(x.v||'')+'</span><div class="chart-track"><div class="chart-bar '+(x.v?'has-value':'is-empty')+'" style="height:'+h+'px"></div></div><span class="chart-label">'+escapeHTML(formatChartDay(date))+'</span></div>';
+        const value=x.v ? x.v : (x.rest?'repos':'');
+        const title=x.rest && !x.v ? x.k+' · repos' : x.k+' · '+x.v+' exercice(s)';
+        const barClass=x.v?'has-value':(x.rest?'is-rest':'is-empty');
+        return '<div class="chart-day" title="'+escapeHTML(title)+'"><span class="chart-value '+(x.rest&&!x.v?'is-rest':'')+'">'+escapeHTML(value)+'</span><div class="chart-track"><div class="chart-bar '+barClass+'" style="height:'+h+'px"></div></div><span class="chart-label">'+escapeHTML(formatChartDay(date))+'</span></div>';
       }).join('')}
     </div>`;
 
