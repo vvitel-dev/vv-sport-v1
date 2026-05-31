@@ -2459,7 +2459,6 @@ function sessionStatusHTML(){
     return '<div class="session-status session-complete">'+
       '<div class="session-status-title"><span>Avancement</span><strong>'+info.total+'/'+info.total+' · 100%</strong></div>'+
       '<div class="session-next done">Tous les exercices sont terminés.</div>'+
-      '<div class="session-actions"><button class="session-start-btn session-complete-btn" type="button" disabled>Séance terminée</button></div>'+
     '</div>';
   }
 
@@ -2468,13 +2467,11 @@ function sessionStatusHTML(){
     return '<div class="session-status session-complete">'+
       '<div class="session-status-title"><span>Avancement</span><strong>'+info.total+'/'+info.total+' · 100%</strong></div>'+
       '<div class="session-next done">Tous les exercices sont terminés.</div>'+
-      '<div class="session-actions"><button class="session-start-btn session-complete-btn" type="button" disabled>Séance terminée</button></div>'+
     '</div>';
   }
   return '<div class="session-status">'+
     '<div class="session-status-title"><span>Avancement</span><strong>'+info.done+'/'+info.total+' · '+info.pct+'%</strong></div>'+
     '<div class="session-next">Prochain exercice : '+next+'</div>'+
-    '<div class="session-actions"><button class="session-start-btn" onclick="startTodaySession()">Démarrer ma séance du jour</button></div>'+
   '</div>';
 }
 
