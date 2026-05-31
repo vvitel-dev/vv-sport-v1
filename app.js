@@ -2996,13 +2996,25 @@ function timerContextLabel(){
 function syncTimerLabels(){
   const statusEl=document.getElementById('timer-status-label');
   const contextEl=document.getElementById('timer-context');
+  const card=document.querySelector('.timer-card');
+  const status=timerStatusLabel();
 
-  if(statusEl)statusEl.textContent=timerStatusLabel();
+  if(statusEl)statusEl.textContent=status;
   if(contextEl)contextEl.textContent=timerContextLabel();
 
   document.body.classList.toggle('timer-is-prep',timer.pendingStart||timer.phase==='prep');
   document.body.classList.toggle('timer-is-rest',timer.phase==='rest');
   document.body.classList.toggle('timer-is-effort',timer.running&&timer.phase==='effort');
+  document.body.classList.toggle('timer-is-paused',status==='En pause');
+
+  if(card){
+    card.classList.toggle('is-running',timer.running);
+    card.classList.toggle('is-paused',status==='En pause');
+    card.classList.toggle('is-rest',timer.phase==='rest');
+    card.classList.toggle('is-prep',timer.pendingStart||timer.phase==='prep');
+    card.classList.toggle('is-done',status==='Terminé');
+    card.classList.toggle('has-session',canRestartTimer());
+  }
 }
 
 
@@ -3196,10 +3208,13 @@ function updateMainTimerButton(){
   if(btn){
     if(timer.running){
       btn.textContent='Pause';
+      btn.setAttribute('aria-label','Mettre le minuteur en pause');
     }else if(hasActiveTimerSession()){
       btn.textContent='Reprendre';
+      btn.setAttribute('aria-label','Reprendre le minuteur');
     }else{
       btn.textContent='Commencer';
+      btn.setAttribute('aria-label','Commencer le minuteur');
     }
   }
 
@@ -3248,6 +3263,7 @@ display.classList.toggle('running',timer.running);
 
   const mainTimerBtn=document.getElementById('main-timer-btn');
   if(mainTimerBtn)mainTimerBtn.classList.toggle('running',timer.running);
+  if(mainTimerBtn)mainTimerBtn.classList.toggle('paused',!timer.running&&hasActiveTimerSession());
   syncTimerButtons();
 }
 
