@@ -23,6 +23,7 @@ const storageSafe = {
     }
   }
 };
+const APP_VERSION='1.1.0';
 let currentTab=storageSafe.getItem('vv-current-tab')||'program';
 let programView=storageSafe.getItem('vv-program-view')||'today';
 if(currentTab==='today'||currentTab==='week'){
@@ -1316,6 +1317,41 @@ function statsSummary(){
   }
   return {list,byDate,sessions,exercises,minutes,streak};
 }
+
+function weekStatsSummary(){
+  const rows=DAYS.map(day=>{
+    const exercises=(P()[day]&&P()[day].exercises?P()[day].exercises:[]).filter(ex=>ex.type!=='repos');
+    const total=exercises.length;
+    const done=exercises.filter(ex=>getDone(ex,day)).length;
+    return {day,total,done,pct:total?Math.round(done/total*100):0,rest:!total};
+  });
+  const workoutDays=rows.filter(x=>!x.rest);
+  const doneDays=workoutDays.filter(x=>x.total && x.done>=x.total).length;
+  const totalExercises=workoutDays.reduce((sum,x)=>sum+x.total,0);
+  const doneExercises=workoutDays.reduce((sum,x)=>sum+x.done,0);
+  const restDays=rows.filter(x=>x.rest).length;
+  return {
+    rows,
+    doneDays,
+    workoutDays:workoutDays.length,
+    restDays,
+    totalExercises,
+    doneExercises,
+    pct:totalExercises?Math.round(doneExercises/totalExercises*100):0
+  };
+}
+
+function weekStatsHTML(){
+  const w=weekStatsSummary();
+  return '<div class="week-stats">'+
+    '<div class="week-stats-top"><div><strong>'+w.pct+'%</strong><span>semaine actuelle</span></div><small>'+w.doneExercises+'/'+w.totalExercises+' exercices · '+w.restDays+' repos</small></div>'+
+    '<div class="week-stat-days">'+w.rows.map(x=>{
+      const cls=x.rest?'rest':(x.pct>=100?'done':(x.pct>0?'partial':''));
+      const label=x.rest?'repos':x.pct+'%';
+      return '<div class="week-stat-day '+cls+'" title="'+escapeHTML(x.day)+' · '+escapeHTML(label)+'"><span>'+escapeHTML(x.day.slice(0,3))+'</span><b>'+escapeHTML(label)+'</b></div>';
+    }).join('')+'</div>'+
+  '</div>';
+}
 function coachAdvice(){
   const p=pct(currentDay);
   const day=P()[currentDay];
@@ -1367,6 +1403,83 @@ function resetStats(){
   storageSafe.removeItem('vv-history');
   renderStats();
 }
+
+function vvStorageKeys(){
+  const keys=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && (k.startsWith('vv-') || k.startsWith('done-') || k.startsWith('note-')))keys.push(k);
+    }
+  }catch(e){}
+  return keys.sort();
+}
+
+function exportUserData(){
+  const data={
+    app:'vV Sport',
+    version:APP_VERSION,
+    exportedAt:new Date().toISOString(),
+    values:{}
+  };
+  vvStorageKeys().forEach(k=>{data.values[k]=storageSafe.getItem(k);});
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='vv-sport-data-'+todayKey()+'.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function triggerImportUserData(){
+  const input=document.getElementById('import-data-input');
+  if(input)input.click();
+}
+
+function importUserData(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(){
+    try{
+      const data=JSON.parse(String(reader.result||'{}'));
+      const values=data.values || data;
+      const keys=Object.keys(values).filter(k=>k.startsWith('vv-') || k.startsWith('done-') || k.startsWith('note-'));
+      if(!keys.length)throw new Error('Aucune donnée vV Sport trouvée.');
+      if(!confirm('Importer ces données et remplacer les données locales actuelles ?'))return;
+      keys.forEach(k=>storageSafe.setItem(k,String(values[k])));
+      location.reload();
+    }catch(e){
+      alert('Import impossible : '+(e.message||'fichier invalide'));
+    }
+  };
+  reader.readAsText(file);
+}
+
+function resetProgressData(){
+  if(!confirm('Réinitialiser uniquement la progression cochée ? Les notes et stats restent conservées.'))return;
+  vvStorageKeys().filter(k=>k.startsWith('done-')).forEach(k=>storageSafe.removeItem(k));
+  renderAll();
+  saveAppState();
+}
+
+function resetNotesData(){
+  if(!confirm('Supprimer toutes les notes personnelles ?'))return;
+  vvStorageKeys().filter(k=>k.startsWith('note-')).forEach(k=>storageSafe.removeItem(k));
+  renderAll();
+  saveAppState();
+}
+
+function resetProfileData(){
+  if(!confirm('Réinitialiser le profil, le matériel et les options ? Progression, notes et stats restent conservées.'))return;
+  ['vv-level','vv-mode','vv-ready','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound'].forEach(k=>storageSafe.removeItem(k));
+  profile={level:'',mode:''};
+  equipment={rings:true,push:true,db:true,treadmill:true,bike:true};
+  soundEnabled=true;
+  showProfileSetup();
+}
 function renderStats(){
   const s=statsSummary();
   const q=id=>document.getElementById(id);
@@ -1404,6 +1517,9 @@ function renderStats(){
         return '<div class="chart-day" title="'+escapeHTML(title)+'"><span class="chart-value '+(x.rest&&!x.v?'is-rest':'')+'">'+escapeHTML(value)+'</span><div class="chart-track"><div class="chart-bar '+barClass+'" style="height:'+h+'px"></div></div><span class="chart-label">'+escapeHTML(formatChartDay(date))+'</span></div>';
       }).join('')}
     </div>`;
+
+  const weekBox=q('stats-week');
+  if(weekBox)weekBox.innerHTML=weekStatsHTML();
 
   const hist=q('history-list');
   if(hist){
@@ -1742,6 +1858,41 @@ function renderOptions(){
     <div class="setup-label" style="padding-left:12px">Matériel disponible</div>
     <div style="padding:0 12px" class="choice-grid">${equipmentChoicesHTML()}</div>
 
+    <div class="setup-label" style="padding-left:12px">Données</div>
+    <div style="padding:0 12px" class="choice-grid">
+      <button class="choice-btn" type="button" onclick="exportUserData()">
+        <strong>Exporter mes données</strong>
+        <span>Sauvegarde profil, notes, progression et stats en JSON.</span>
+      </button>
+      <button class="choice-btn" type="button" onclick="triggerImportUserData()">
+        <strong>Importer une sauvegarde</strong>
+        <span>Restaure un fichier exporté depuis vV Sport.</span>
+      </button>
+      <input id="import-data-input" class="hidden" type="file" accept="application/json,.json" onchange="importUserData(this.files&&this.files[0]);this.value=''">
+    </div>
+
+    <div class="setup-label" style="padding-left:12px">Réinitialiser</div>
+    <div style="padding:0 12px" class="choice-grid danger-grid">
+      <button class="choice-btn danger-choice" type="button" onclick="resetProgressData()">
+        <strong>Progression cochée</strong>
+        <span>Garde les notes, stats et réglages.</span>
+      </button>
+      <button class="choice-btn danger-choice" type="button" onclick="resetNotesData()">
+        <strong>Notes personnelles</strong>
+        <span>Supprime seulement les notes des cartes.</span>
+      </button>
+      <button class="choice-btn danger-choice" type="button" onclick="resetStats()">
+        <strong>Stats et historique</strong>
+        <span>Remet à zéro les séances, exercices et streak.</span>
+      </button>
+      <button class="choice-btn danger-choice" type="button" onclick="resetProfileData()">
+        <strong>Profil et matériel</strong>
+        <span>Relance la configuration initiale.</span>
+      </button>
+    </div>
+
+    <div class="app-version">vV Sport ${APP_VERSION}</div>
+
     <div style="padding:20px 12px 90px">
       <button class="primary-btn" onclick="saveProfileAndEnter()">Appliquer</button>
     </div>
@@ -1808,6 +1959,44 @@ function currentDaySessionInfo(){
   const pct=total?Math.round(done/total*100):0;
   const nextExercise=P()[currentDay].exercises.find(ex=>ex.type!=='repos'&&!getDone(ex));
   return {steps,done,total,pct,nextExercise};
+}
+
+function estimatedDayMinutes(dayName=currentDay){
+  const day=P()[dayName];
+  const exercises=(day&&day.exercises?day.exercises:[]).filter(ex=>ex.type!=='repos');
+  if(!exercises.length)return 0;
+  return Math.max(1,Math.round(exercises.reduce((sum,ex)=>{
+    if(ex.circuit&&ex.circuit.length){
+      return sum+ex.circuit.reduce((s,st)=>s+(st.effort||0)+(st.rest||0),0);
+    }
+    return sum+(ex.effort||40)+(ex.rest||0);
+  },0)/60));
+}
+
+function programHeroHTML(){
+  const day=P()[currentDay];
+  const info=currentDaySessionInfo();
+  const restDay=!info.total;
+  const next=info.nextExercise;
+  const minutes=estimatedDayMinutes(currentDay);
+  const buttonLabel=info.done>0?'Reprendre ma séance':'Démarrer ma séance';
+  const status=restDay?'Repos':(info.pct>=100?'Terminé':(info.done?'En cours':'Prêt'));
+
+  if(restDay){
+    return '<div class="program-hero rest">'+
+      '<div class="program-hero-main"><span>Programme du jour</span><strong>'+escapeHTML(currentDay)+'</strong><em>'+escapeHTML(day.title)+' · récupération</em></div>'+
+      '<div class="program-hero-meter"><b>Repos</b><small>0 exercice compté</small></div>'+
+      '<div class="program-hero-next">Tu peux cocher la carte repos pour marquer la journée, sans impacter tes stats sportives.</div>'+
+    '</div>';
+  }
+
+  return '<div class="program-hero">'+
+    '<div class="program-hero-main"><span>Programme du jour</span><strong>'+escapeHTML(currentDay)+'</strong><em>'+escapeHTML(day.title)+' · ~'+minutes+' min</em></div>'+
+    '<div class="program-hero-meter"><b>'+info.pct+'%</b><small>'+info.done+'/'+info.total+' exercices</small></div>'+
+    '<div class="program-hero-progress"><div style="width:'+info.pct+'%"></div></div>'+
+    '<div class="program-hero-next">'+(next?'Prochain : '+escapeHTML(next.name):'Séance terminée')+'</div>'+
+    '<button class="program-main-action" type="button" '+(info.pct>=100?'disabled':'onclick="startTodaySession()"')+'>'+(info.pct>=100?'Séance terminée':buttonLabel)+'</button>'+
+  '</div>';
 }
 
 function startTodaySession(){
@@ -2040,7 +2229,15 @@ function sessionStatusHTML(){
   '</div>';
 }
 
-function renderInfo(){const p=P()[currentDay];document.getElementById('day-info-card').innerHTML=`<div class="card"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" onclick="resetDay()">Reset</button></div><div class="prog-row"><span class="prog-label">Progression</span><span class="prog-pct">${pct(currentDay)}%</span></div><div class="prog-track"><div class="prog-fill" style="width:${pct(currentDay)}%"></div></div>${sessionStatusHTML()}</div>`}
+function renderInfo(){
+  const p=P()[currentDay];
+  const info=currentDaySessionInfo();
+  const progress=pct(currentDay);
+  const restDay=!info.total;
+  document.getElementById('day-info-card').innerHTML=
+    programHeroHTML()+
+    `<div class="card day-detail-card ${restDay?'rest-day-card':''}"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" onclick="resetDay()">Reset</button></div><div class="prog-row"><span class="prog-label">${restDay?'Repos':'Progression'}</span><span class="prog-pct">${restDay?'neutre':progress+'%'}</span></div><div class="prog-track"><div class="prog-fill" style="width:${restDay?100:progress}%"></div></div>${sessionStatusHTML()}${sessionPlanHTML()}</div>`;
+}
 
 function circuitHTML(ex){
   if(!ex.circuit||!ex.circuit.length)return '';
@@ -2065,7 +2262,7 @@ function renderExercises(){
     const visualKey=chooseExerciseVisual(ex);
     const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
     const checkLabel=ex.type==='repos'?'Valider le repos':'Valider l’exercice';
-    return `<div class="ex-card ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div><div class="ex-meta"><strong>Cible :</strong> ${ex.target}<br><strong>Comment faire :</strong> ${ex.how}<br><strong>Conseil :</strong> ${ex.tips}</div>${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
+    return `<div class="ex-card ${ex.type==='repos'?'rest-card':''} ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div><div class="ex-meta"><strong>Cible :</strong> ${ex.target}<br><strong>Comment faire :</strong> ${ex.how}<br><strong>Conseil :</strong> ${ex.tips}</div>${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
   }).join('');
 }
 
@@ -2280,6 +2477,7 @@ function ensureStatsTab(){
     </div>
     <div class="coach-card"><div class="coach-title">Coach</div><div class="coach-text" id="coach-text">Lance ou valide quelques exercices pour créer tes premières stats.</div></div>
     <div class="coach-card"><div class="coach-title">7 derniers jours</div><div class="chart" id="stats-chart"></div></div>
+    <div class="coach-card"><div class="coach-title">Semaine actuelle</div><div id="stats-week"></div></div>
     <div class="section-label">Historique par jour</div><div class="history-list" id="history-list"></div>`;
   if(options)appScreen.insertBefore(el,options); else appScreen.insertBefore(el,appScreen.querySelector('.tab-bar'));
 }
@@ -2928,7 +3126,30 @@ function toggleTimer(){
   syncTimerLabels();
   if(typeof updateMainTimerButton==='function')updateMainTimerButton();
 }
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
+function registerServiceWorker(){
+  if(!('serviceWorker' in navigator))return;
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      reg.update&&reg.update();
+      if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});
+      reg.addEventListener('updatefound',()=>{
+        const worker=reg.installing;
+        if(!worker)return;
+        worker.addEventListener('statechange',()=>{
+          if(worker.state==='installed' && navigator.serviceWorker.controller){
+            storageSafe.setItem('vv-update-ready','1');
+          }
+        });
+      });
+    }).catch(()=>{});
+  });
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(storageSafe.getItem('vv-reloaded-for-update')===APP_VERSION)return;
+    storageSafe.setItem('vv-reloaded-for-update',APP_VERSION);
+    window.location.reload();
+  });
+}
+registerServiceWorker();
 boot();
 
 
