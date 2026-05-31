@@ -23,7 +23,7 @@ const storageSafe = {
     }
   }
 };
-const APP_VERSION='1.1.0';
+const APP_VERSION='1.2.0';
 let currentTab=storageSafe.getItem('vv-current-tab')||'program';
 let programView=storageSafe.getItem('vv-program-view')||'today';
 if(currentTab==='today'||currentTab==='week'){
@@ -44,10 +44,33 @@ function vvFatalError(message){
   }catch(e){}
 }
 
-const LEVELS={debutant:{label:'Débutant',sub:'Effort plus court, repos plus long',factor:.75,rest:1.35},medium:{label:'Medium',sub:'Équilibre intensité/récupération',factor:1,rest:1},expert:{label:'Expert',sub:'Effort plus long, repos court',factor:1.25,rest:.65},perso:{label:'Perso',sub:'38 ans · 72 kg · 1,78 m · prise musculaire',factor:1.08,rest:1.05}};
+const LEVELS={debutant:{label:'Débutant',sub:'Effort plus court, repos plus long',factor:.75,rest:1.35},medium:{label:'Medium',sub:'Équilibre intensité/récupération',factor:1,rest:1},expert:{label:'Expert',sub:'Effort plus long, repos court',factor:1.25,rest:.65},perso:{label:'Perso',sub:'Questionnaire + programme adapté',factor:1.08,rest:1.05}};
 const MODES={classique:{label:'Ancien mode',sub:'Poids du corps'},anneaux:{label:'Anneaux',sub:'Force, stabilité, gainage'},supports:{label:'Supports de pompes',sub:'Amplitude, poignets, épaules'}};
 const DUR={compose:{effort:40,rest:90},isolation:{effort:35,rest:60},abdos:{effort:35,rest:45},gainage:{effort:45,rest:45},mobilite:{effort:45,rest:20},repos:{effort:0,rest:0}};
 const PERSONAL={name:'Vincent',age:38,weight:72,height:178,goal:'Prise musculaire',pushups:30,pullups:5,plank:90};
+const CUSTOM_PROFILE_DEFAULT={
+  name:'',
+  age:'',
+  weight:'',
+  height:'',
+  goal:'muscle',
+  experience:'intermediate',
+  sessions:'4',
+  sessionTime:'45',
+  pushups:'10',
+  pullups:'0',
+  plank:'30',
+  focus:'balanced',
+  limitation:'none'
+};
+function loadCustomProfile(){
+  try{
+    return {...CUSTOM_PROFILE_DEFAULT,...JSON.parse(storageSafe.getItem('vv-custom-profile')||'{}')};
+  }catch(e){
+    return {...CUSTOM_PROFILE_DEFAULT};
+  }
+}
+let customProfile=loadCustomProfile();
 
 const CIRCUITS={
   'Circuit complet':[
@@ -610,7 +633,7 @@ function toggleEquipment(k){
   saveAppState();
 }
 function renderEquipment(){
- ['rings','push','db','treadmill'].forEach(k=>{
+ ['rings','push','db','treadmill','bike'].forEach(k=>{
    const el=document.getElementById('toggle-'+k);
    if(el)el.classList.toggle('active',equipment[k]);
  });
@@ -905,7 +928,14 @@ function normalizeProgramSvgs(p){
   return p;
 }
 
-function scaleSeconds(s,isRest=false){if(!s)return 0;const l=LEVELS[profile.level]||LEVELS.medium;return Math.max(10,Math.round(s*(isRest?l.rest:l.factor)/5)*5)}
+function activeLevelConfig(){
+  if(profile.level!=='perso')return LEVELS[profile.level]||LEVELS.medium;
+  const diff=customDifficulty();
+  if(diff==='beginner')return {factor:.82,rest:1.28};
+  if(diff==='advanced')return {factor:1.18,rest:.82};
+  return LEVELS.perso;
+}
+function scaleSeconds(s,isRest=false){if(!s)return 0;const l=activeLevelConfig();return Math.max(10,Math.round(s*(isRest?l.rest:l.factor)/5)*5)}
 
 
 function cardioEquipmentExercise(minutes='25–35 min'){
@@ -962,6 +992,145 @@ function cardioEquipmentExercise(minutes='25–35 min'){
   };
 }
 
+function customNumber(key,fallback){
+  const n=Number(customProfile&&customProfile[key]);
+  return Number.isFinite(n)&&n>0?n:fallback;
+}
+
+function customDifficulty(){
+  const push=customNumber('pushups',10);
+  const pull=Number(customProfile&&customProfile.pullups)||0;
+  const plank=customNumber('plank',30);
+  const exp=(customProfile&&customProfile.experience)||'intermediate';
+  if(exp==='beginner' || push<8 || plank<25)return 'beginner';
+  if(exp==='advanced' || push>=30 || pull>=6 || plank>=90)return 'advanced';
+  return 'intermediate';
+}
+
+function customGoalLabel(){
+  const goal=(customProfile&&customProfile.goal)||'muscle';
+  return {muscle:'prise musculaire',strength:'force',fatloss:'perte de gras',mobility:'mobilité',general:'forme générale'}[goal]||'programme perso';
+}
+
+function customProfileSummary(){
+  if(!customProfile)return 'Profil personnalisé';
+  const bits=[];
+  if(customProfile.name)bits.push(customProfile.name);
+  bits.push(customGoalLabel());
+  if(customProfile.sessionTime)bits.push(customProfile.sessionTime+' min');
+  return bits.join(' · ');
+}
+
+function saveCustomProfileField(key,value){
+  customProfile={...CUSTOM_PROFILE_DEFAULT,...customProfile,[key]:String(value)};
+  storageSafe.setItem('vv-custom-profile',JSON.stringify(customProfile));
+  if(profile.level==='perso'){
+    renderAll();
+    saveAppState();
+  }
+}
+
+function personalSets(base){
+  const diff=customDifficulty();
+  const time=customNumber('sessionTime',45);
+  if(time<=30)return base.replace(/^5/g,'3').replace(/^4/g,'3');
+  if(diff==='beginner')return base.replace(/^5/g,'3').replace(/^4/g,'3');
+  if(diff==='advanced' && time>=55)return base.replace(/^3/g,'4').replace(/^4/g,'5');
+  return base;
+}
+
+function customPushExercise(){
+  const diff=customDifficulty();
+  const shoulder=(customProfile.limitation==='shoulder');
+  if(diff==='beginner')return {name:equipment.push?'Pompes inclinées sur supports':'Pompes inclinées ou genoux',sets:personalSets('3 × 8–12'),target:'Pecs, triceps, gainage',how:'Choisis une inclinaison qui reste propre. Corps aligné, descente contrôlée.',tips:'Garde 2 répétitions en réserve. La régularité compte plus que l’échec.',svg:'push',type:'compose'};
+  if(shoulder)return {name:'Pompes tempo amplitude confortable',sets:personalSets('4 × 8–15'),target:'Pecs, triceps',how:'Descends seulement sans gêne, tempo lent, épaules basses.',tips:'Aucune douleur épaule. Réduis l’amplitude si besoin.',svg:'push',type:'compose'};
+  if(equipment.rings)return {name:'Ring push-ups tempo',sets:personalSets('4 × 8–12'),target:'Pecs, triceps, stabilité',how:'Anneaux contrôlés, descente 3 sec, remontée propre.',tips:'Tension et stabilité avant vitesse.',svg:'rings',type:'compose'};
+  return {name:equipment.push?'Pompes profondes supports tempo':'Pompes tempo',sets:personalSets('4 × 8–15'),target:'Pecs, triceps, gainage',how:'Descente lente, pause courte, remontée contrôlée.',tips:'Arrête 1 ou 2 reps avant de perdre la forme.',svg:'push',type:'compose'};
+}
+
+function customPullExercise(){
+  const pull=Number(customProfile.pullups)||0;
+  if(pull<1)return {name:equipment.rings?'Rowing anneaux facile':'Rowing haltères ou serviette',sets:personalSets('4 × 10–15'),target:'Dos, biceps',how:'Tire avec les coudes, serre les omoplates, descends lentement.',tips:'Base prioritaire avant les tractions.',svg:equipment.rings?'rings':'db',type:'compose'};
+  if(pull<5)return {name:'Tractions négatives + assistées',sets:personalSets('4 × 2–4'),target:'Dos, biceps',how:'Monte avec aide, descends en 3 à 5 sec.',tips:'Peu de reps, mais propres.',svg:'pull',type:'compose'};
+  return {name:'Tractions progression',sets:personalSets('5 × 3–6'),target:'Dos, biceps',how:'Tractions strictes, garde une répétition en réserve.',tips:'Objectif progression sans tricher.',svg:'pull',type:'compose'};
+}
+
+function adaptPersonalProgramToCustom(p){
+  const goal=customProfile.goal||'muscle';
+  const focus=customProfile.focus||'balanced';
+  const limit=customProfile.limitation||'none';
+  const time=customNumber('sessionTime',45);
+  const sessions=customNumber('sessions',4);
+  const diff=customDifficulty();
+
+  p.Lundi.title='Perso · '+customGoalLabel()+' · Push';
+  p.Lundi.duration=time<=30?'25–35 min':(time>=55?'55–70 min':'40–55 min');
+  p.Lundi.exercises[0]=customPushExercise();
+  if(limit==='shoulder'){
+    p.Lundi.exercises[1]={name:'Pompes serrées inclinées',sets:personalSets('3 × 8–12'),target:'Triceps, pecs',how:'Mains serrées mais épaules confortables, amplitude courte si besoin.',tips:'Pas de dips si l’épaule proteste.',svg:'push',type:'compose'};
+  }
+
+  p.Mardi.title='Perso · '+(focus==='pull'?'priorité dos/tractions':'Pull équilibrage');
+  p.Mardi.exercises[0]=customPullExercise();
+
+  if(goal==='fatloss'){
+    p.Mercredi.title='Perso · cardio doux + abdos';
+    p.Mercredi.exercises[0]=cardioEquipmentExercise(time>=45?'30–40 min':'20–30 min');
+    p.Samedi.title='Perso · circuit métabolique propre';
+  }
+
+  if(goal==='strength'){
+    p.Lundi.exercises[0].sets=personalSets(diff==='advanced'?'5 × 5–8':'4 × 5–8');
+    p.Mardi.exercises[0].sets=personalSets(diff==='advanced'?'5 × 3–5':'4 × 3–5');
+    p.Vendredi.title='Perso · force full body';
+    p.Vendredi.exercises[0]=customPushExercise();
+    p.Vendredi.exercises[1].sets=personalSets('5 × 6–10 / jambe');
+  }
+
+  if(goal==='mobility' || limit==='back'){
+    p.Jeudi.title='Perso · mobilité renforcée';
+    p.Jeudi.exercises.unshift({name:'Respiration + mobilité hanches',sets:'8 min',target:'Dos, hanches',how:'Respiration lente, bascule bassin, ouverture de hanches douce.',tips:'Cherche le relâchement, pas la performance.',svg:'mobility',type:'mobilite'});
+    p.Vendredi.exercises[1]={name:'Squats contrôlés amplitude confortable',sets:personalSets('3 × 10–15'),target:'Jambes, mobilité',how:'Descente lente, dos long, amplitude sans gêne.',tips:'Si le dos tire, réduis l’amplitude.',svg:'legs',type:'compose'};
+  }
+
+  if(focus==='core'){
+    p.Mercredi.exercises.push({name:'Gainage personnalisé',sets:personalSets('3 × '+Math.max(20,customNumber('plank',30)-10)+' sec'),target:'Core',how:'Tiens propre, respiration calme, stop avant cambrure.',tips:'Le bon gainage reste aligné.',svg:'plank',type:'gainage'});
+  }
+
+  if(focus==='legs'){
+    p.Vendredi.exercises.splice(2,0,{name:'Fentes arrière contrôlées',sets:personalSets('3 × 10–12 / jambe'),target:'Jambes, fessiers',how:'Grand pas arrière, buste stable, remonte en poussant dans le sol.',tips:'Genou stable, pas de rebond.',svg:'legs',type:'compose'});
+  }
+
+  if(focus==='push'){
+    p.Vendredi.exercises[0]=customPushExercise();
+    p.Samedi.exercises.push({name:'Finisher push propre',sets:personalSets('3 × 8–12'),target:'Pecs, triceps',how:'Pompes lentes, amplitude confortable, arrêt avant échec technique.',tips:'Volume utile, pas de reps sales.',svg:'push',type:'compose'});
+  }
+
+  if(sessions<=3){
+    p.Mercredi.exercises=[cardioEquipmentExercise('20–30 min'),{name:'Mobilité complète',sets:'12 min',target:'Récupération',how:'Épaules, hanches, dos, respiration lente.',tips:'Journée légère volontaire.',svg:'mobility',type:'mobilite'}];
+    p.Jeudi.exercises=[{name:'Repos actif',sets:'Récupération',target:'Repos',how:'Marche tranquille ou mobilité légère.',tips:'Jour neutre pour assimiler.',svg:'rest',type:'repos'}];
+    p.Samedi.exercises=[{name:'Repos',sets:'Récupération',target:'Repos',how:'Récupère vraiment, sommeil et hydratation.',tips:'Le repos fait partie du programme.',svg:'rest',type:'repos'}];
+  }else if(sessions>=5 && p.Samedi.exercises.every(ex=>ex.type!=='repos')){
+    p.Samedi.title='Perso · finition ciblée';
+  }
+
+  Object.values(p).forEach(day=>day.exercises.forEach(ex=>{
+    if(limit==='shoulder' && /dips|pike/i.test(ex.name||'')){
+      ex.name='Alternative épaules confortables';
+      ex.how='Mouvement sans douleur, amplitude courte, tempo lent.';
+      ex.tips='La priorité est de garder les épaules calmes.';
+      ex.svg='mobility';
+    }
+    if(limit==='knee' && /squat|fente|bulgarian/i.test(ex.name||'')){
+      ex.name='Jambes amplitude confortable';
+      ex.how='Amplitude réduite si besoin, genoux stables, contrôle lent.';
+      ex.tips='Pas de douleur genou. Ajuste la profondeur.';
+    }
+  }));
+
+  return p;
+}
+
 function buildPersonalProgram(){
   const p={
     Lundi:{title:'Perso · Push hypertrophie',duration:'55–70 min',warmup:'5 min tapis vitesse facile + mobilité épaules/poignets',exercises:[
@@ -1001,12 +1170,13 @@ function buildPersonalProgram(){
       {name:'Repos',sets:'Récupération',target:'Repos',how:'Hydratation, sommeil, marche légère possible.',tips:'Pas de minuteur : récupération obligatoire.',svg:'rest',type:'repos'}
     ]}
   };
-  Object.values(p).forEach(day=>day.exercises.forEach(ex=>{
+  const adapted=adaptPersonalProgramToCustom(p);
+  Object.values(adapted).forEach(day=>day.exercises.forEach(ex=>{
     const d=DUR[ex.type]||DUR.compose;
     ex.effort=scaleSeconds(d.effort,false);
     ex.rest=scaleSeconds(d.rest,true);
   }));
-  return p;
+  return adapted;
 }
 
 
@@ -1200,6 +1370,82 @@ function selectMode(k){
   saveAppState();
 }
 
+function customProfileFormHTML(){
+  const c={...CUSTOM_PROFILE_DEFAULT,...customProfile};
+  const selected=(key,value)=>String(c[key])===String(value)?'selected':'';
+  return `
+    <div class="custom-profile-panel ${profile.level==='perso'?'active':''}">
+      <div class="custom-profile-head">
+        <strong>Profil personnalisé</strong>
+        <span>${escapeHTML(customProfileSummary())}</span>
+      </div>
+      <div class="custom-form-grid">
+        <label>Prénom <input type="text" value="${escapeHTML(c.name)}" placeholder="Optionnel" oninput="saveCustomProfileField('name',this.value)"></label>
+        <label>Âge <input type="number" min="12" max="90" value="${escapeHTML(c.age)}" placeholder="38" oninput="saveCustomProfileField('age',this.value)"></label>
+        <label>Poids <input type="number" min="30" max="200" value="${escapeHTML(c.weight)}" placeholder="72" oninput="saveCustomProfileField('weight',this.value)"></label>
+        <label>Taille <input type="number" min="120" max="230" value="${escapeHTML(c.height)}" placeholder="178" oninput="saveCustomProfileField('height',this.value)"></label>
+      </div>
+      <div class="custom-form-grid">
+        <label>Objectif
+          <select onchange="saveCustomProfileField('goal',this.value)">
+            <option value="muscle" ${selected('goal','muscle')}>Prise musculaire</option>
+            <option value="strength" ${selected('goal','strength')}>Force</option>
+            <option value="fatloss" ${selected('goal','fatloss')}>Perte de gras</option>
+            <option value="mobility" ${selected('goal','mobility')}>Mobilité / récupération</option>
+            <option value="general" ${selected('goal','general')}>Forme générale</option>
+          </select>
+        </label>
+        <label>Niveau réel
+          <select onchange="saveCustomProfileField('experience',this.value)">
+            <option value="beginner" ${selected('experience','beginner')}>Débutant</option>
+            <option value="intermediate" ${selected('experience','intermediate')}>Intermédiaire</option>
+            <option value="advanced" ${selected('experience','advanced')}>Avancé</option>
+          </select>
+        </label>
+        <label>Séances/semaine
+          <select onchange="saveCustomProfileField('sessions',this.value)">
+            <option value="3" ${selected('sessions','3')}>3</option>
+            <option value="4" ${selected('sessions','4')}>4</option>
+            <option value="5" ${selected('sessions','5')}>5</option>
+            <option value="6" ${selected('sessions','6')}>6</option>
+          </select>
+        </label>
+        <label>Temps/séance
+          <select onchange="saveCustomProfileField('sessionTime',this.value)">
+            <option value="30" ${selected('sessionTime','30')}>30 min</option>
+            <option value="45" ${selected('sessionTime','45')}>45 min</option>
+            <option value="60" ${selected('sessionTime','60')}>60 min</option>
+          </select>
+        </label>
+      </div>
+      <div class="custom-form-grid performance-grid">
+        <label>Pompes propres <input type="number" min="0" max="100" value="${escapeHTML(c.pushups)}" oninput="saveCustomProfileField('pushups',this.value)"></label>
+        <label>Tractions <input type="number" min="0" max="50" value="${escapeHTML(c.pullups)}" oninput="saveCustomProfileField('pullups',this.value)"></label>
+        <label>Gainage sec <input type="number" min="0" max="600" value="${escapeHTML(c.plank)}" oninput="saveCustomProfileField('plank',this.value)"></label>
+      </div>
+      <div class="custom-form-grid">
+        <label>Priorité
+          <select onchange="saveCustomProfileField('focus',this.value)">
+            <option value="balanced" ${selected('focus','balanced')}>Équilibré</option>
+            <option value="push" ${selected('focus','push')}>Pecs / triceps</option>
+            <option value="pull" ${selected('focus','pull')}>Dos / tractions</option>
+            <option value="legs" ${selected('focus','legs')}>Jambes</option>
+            <option value="core" ${selected('focus','core')}>Abdos / gainage</option>
+          </select>
+        </label>
+        <label>Limite à respecter
+          <select onchange="saveCustomProfileField('limitation',this.value)">
+            <option value="none" ${selected('limitation','none')}>Aucune</option>
+            <option value="shoulder" ${selected('limitation','shoulder')}>Épaules</option>
+            <option value="back" ${selected('limitation','back')}>Dos</option>
+            <option value="knee" ${selected('limitation','knee')}>Genoux</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  `;
+}
+
 function renderChoices(){
   const levelHTML=Object.entries(LEVELS).map(([k,v])=>`
     <button class="choice-btn ${profile.level===k?'active':''}" onclick="selectLevel('${k}')">
@@ -1213,6 +1459,7 @@ function renderChoices(){
 
   if(levelBox)levelBox.innerHTML=levelHTML;
   if(modeBox)modeBox.innerHTML=`
+    ${customProfileFormHTML()}
     <div class="setup-label full-label">Matériel disponible</div>
     ${equipmentChoicesHTML()}
   `;
@@ -1474,8 +1721,9 @@ function resetNotesData(){
 
 function resetProfileData(){
   if(!confirm('Réinitialiser le profil, le matériel et les options ? Progression, notes et stats restent conservées.'))return;
-  ['vv-level','vv-mode','vv-ready','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound'].forEach(k=>storageSafe.removeItem(k));
+  ['vv-level','vv-mode','vv-ready','vv-custom-profile','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound'].forEach(k=>storageSafe.removeItem(k));
   profile={level:'',mode:''};
+  customProfile=loadCustomProfile();
   equipment={rings:true,push:true,db:true,treadmill:true,bike:true};
   soundEnabled=true;
   showProfileSetup();
@@ -1626,7 +1874,7 @@ function updateLaunchInfo(){
   const profileEl=document.getElementById('launch-profile');
   if(dayEl)dayEl.textContent=getRealDay();
   if(profileEl){
-    profileEl.textContent=(profile.level&&LEVELS[profile.level]) ? LEVELS[profile.level].label : 'À configurer';
+    profileEl.textContent=profile.level==='perso' ? customProfileSummary() : ((profile.level&&LEVELS[profile.level]) ? LEVELS[profile.level].label : 'À configurer');
   }
   const resumeBtn=document.getElementById('resume-button');
   if(resumeBtn)resumeBtn.classList.toggle('hidden',!hasResumeState());
@@ -1846,6 +2094,7 @@ function renderOptions(){
 
     <div class="setup-label" style="padding-left:12px">Niveau</div>
     <div style="padding:0 12px" class="choice-grid">${levelHTML}</div>
+    <div style="padding:0 12px">${customProfileFormHTML()}</div>
 
     <div class="setup-label" style="padding-left:12px">Minuteur</div>
     <div style="padding:0 12px" class="choice-grid">
@@ -1901,7 +2150,7 @@ function renderOptions(){
 
 function profilePillLabel(){
   const levelLabel=(LEVELS&&LEVELS[profile.level]) ? LEVELS[profile.level].label : 'Perso';
-  if(profile.level==='perso')return 'Perso · 38 ans · 72 kg · 1,78 m · prise musculaire';
+  if(profile.level==='perso')return 'Perso · '+customProfileSummary();
   return levelLabel;
 }
 
