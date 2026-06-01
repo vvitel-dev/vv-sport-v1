@@ -23,6 +23,32 @@ const storageSafe = {
     }
   }
 };
+
+// Performance optimization: Render debouncing with requestAnimationFrame
+let renderScheduled = false;
+let scheduledRender = null;
+function scheduleRender(renderFn) {
+  if (!renderScheduled) {
+    renderScheduled = true;
+    scheduledRender = renderFn;
+    requestAnimationFrame(() => {
+      if (scheduledRender) scheduledRender();
+      renderScheduled = false;
+      scheduledRender = null;
+    });
+  }
+}
+
+// Render memoization to prevent duplicate consecutive renders
+let lastRenderState = null;
+function shouldRender() {
+  const state = { currentTab, programView, currentDay };
+  const stateStr = JSON.stringify(state);
+  if (lastRenderState === stateStr) return false;
+  lastRenderState = stateStr;
+  return true;
+}
+
 const APP_VERSION='1.2.0';
 let currentTab=storageSafe.getItem('vv-current-tab')||'program';
 let programView=storageSafe.getItem('vv-program-view')||'today';
@@ -931,9 +957,9 @@ function normalizeProgramSvgs(p){
 function activeLevelConfig(){
   if(profile.level!=='perso')return LEVELS[profile.level]||LEVELS.medium;
   const diff=customDifficulty();
-  if(diff==='beginner')return {factor:.82,rest:1.28};
-  if(diff==='advanced')return {factor:1.18,rest:.82};
-  return LEVELS.perso;
+  const adj=feedbackAdjustment();
+  const base=diff==='beginner'?{factor:.82,rest:1.28}:(diff==='advanced'?{factor:1.18,rest:.82}:LEVELS.perso);
+  return {factor:base.factor,rest:Math.max(.7,base.rest+adj.restShift)};
 }
 function scaleSeconds(s,isRest=false){if(!s)return 0;const l=activeLevelConfig();return Math.max(10,Math.round(s*(isRest?l.rest:l.factor)/5)*5)}
 
@@ -997,14 +1023,45 @@ function customNumber(key,fallback){
   return Number.isFinite(n)&&n>0?n:fallback;
 }
 
+function feedbackKey(day=currentDay){
+  return 'vv-session-feedback-'+profile.level+'-'+profile.mode+'-'+day;
+}
+
+function getSessionFeedback(day=currentDay){
+  try{return JSON.parse(storageSafe.getItem(feedbackKey(day))||'null')}catch(e){return null}
+}
+
+function saveSessionFeedback(value,day=currentDay){
+  const payload={value,day,date:todayKey(),time:Date.now(),level:profile.level,mode:profile.mode};
+  storageSafe.setItem(feedbackKey(day),JSON.stringify(payload));
+  renderAll();
+  saveAppState();
+}
+
+function recentSessionFeedback(){
+  const feedback=DAYS.map(day=>getSessionFeedback(day)).filter(Boolean).sort((a,b)=>(b.time||0)-(a.time||0));
+  return feedback[0]||null;
+}
+
+function feedbackAdjustment(){
+  const fb=recentSessionFeedback();
+  if(!fb)return {difficultyShift:0,restShift:0,avoidPain:false,value:null};
+  if(fb.value==='easy')return {difficultyShift:1,restShift:-.08,avoidPain:false,value:fb.value};
+  if(fb.value==='hard')return {difficultyShift:-1,restShift:.16,avoidPain:false,value:fb.value};
+  if(fb.value==='pain')return {difficultyShift:-1,restShift:.22,avoidPain:true,value:fb.value};
+  return {difficultyShift:0,restShift:0,avoidPain:false,value:fb.value};
+}
+
 function customDifficulty(){
   const push=customNumber('pushups',10);
   const pull=Number(customProfile&&customProfile.pullups)||0;
   const plank=customNumber('plank',30);
   const exp=(customProfile&&customProfile.experience)||'intermediate';
-  if(exp==='beginner' || push<8 || plank<25)return 'beginner';
-  if(exp==='advanced' || push>=30 || pull>=6 || plank>=90)return 'advanced';
-  return 'intermediate';
+  let rank=2;
+  if(exp==='beginner' || push<8 || plank<25)rank=1;
+  if(exp==='advanced' || push>=30 || pull>=6 || plank>=90)rank=3;
+  rank=Math.max(1,Math.min(3,rank+feedbackAdjustment().difficultyShift));
+  return rank===1?'beginner':(rank===3?'advanced':'intermediate');
 }
 
 function customGoalLabel(){
@@ -1131,52 +1188,178 @@ function adaptPersonalProgramToCustom(p){
   return p;
 }
 
-function buildPersonalProgram(){
-  const p={
-    Lundi:{title:'Perso · Push hypertrophie',duration:'55–70 min',warmup:'5 min tapis vitesse facile + mobilité épaules/poignets',exercises:[
-      {name:equipment.rings?'Ring push-ups tempo':'Pompes profondes supports tempo',sets:'4 × 8–12',target:'Pecs, triceps, gainage',how:'Descente lente 3 sec, pause courte, remontée contrôlée.',tips:'Objectif prise musculaire : tension et amplitude avant vitesse.',svg:equipment.rings?'rings':'push',type:'compose'},
-      {name:equipment.rings?'Dips anneaux assistés/progression':'Dips entre supports ou pompes diamant',sets:'4 × 6–10',target:'Triceps, pecs, épaules',how:'Amplitude contrôlée, épaules basses, pas d’à-coups.',tips:'Si douleur épaule, réduis amplitude.',svg:equipment.rings?'rings':'push',type:'compose'},
-      {name:equipment.db?'Élévations latérales 5 kg tempo':'Pike push-ups contrôlées',sets:equipment.db?'4 × 15–25':'4 × 8–12',target:'Épaules',how:equipment.db?'Monte aux épaules, bloque 1 sec, descends lentement.':'Hanches hautes, pousse verticalement.',tips:'Pas d’élan, brûlure contrôlée.',svg:'default',type:equipment.db?'isolation':'compose'},
-      {name:'Gainage RKC',sets:'3 × 30–45 sec',target:'Abdos & gainage',how:'Contracte fort abdos/fessiers, corps droit.',tips:'Qualité maximale, pas besoin de tenir 3 min.',svg:'plank',type:'gainage'}
-    ]},
-    Mardi:{title:'Perso · Pull priorité tractions',duration:'55–70 min',warmup:'5 min tapis vitesse facile + activation scapulaire',exercises:[
-      {name:'Tractions progression',sets:'5 × 3–5',target:'Dos, biceps',how:'Séries propres. Garde 1 répétition en réserve.',tips:'Objectif passer de 5 à 8–10 tractions.',svg:'default',type:'compose'},
-      {name:equipment.rings?'Rowing anneaux lourd':'Rowing haltères 5 kg tempo lent',sets:equipment.rings?'5 × 8–12':'4 × 20–30',target:'Dos, arrière épaules',how:equipment.rings?'Corps à vitesse réglable, tire poitrine vers anneaux.':'Buste penché, coudes vers l’arrière, tempo lent.',tips:'Plus de volume dos pour équilibrer tes 30 pompes.',svg:equipment.rings?'rings':'default',type:'compose'},
-      {name:equipment.db?'Curl haltères 5 kg tempo':'Curl serviette/isométrique',sets:'4 × 15–25',target:'Biceps',how:'Montée propre, descente lente 3 sec.',tips:'Avec 5 kg, utilise le tempo et les reps longues.',svg:'db',type:'isolation'},
-      {name:'Hollow body hold',sets:'3 × 30–45 sec',target:'Abdos & gainage',how:'Bas du dos collé, jambes tendues si possible.',tips:'Arrête avant de cambrer.',svg:'plank',type:'gainage'}
-    ]},
-    Mercredi:{title:'Perso · Cardio léger + abdos',duration:'35–55 min',warmup:equipment.bike?'Vélo 5 min facile':(equipment.treadmill?'Tapis 5 min vitesse facile':'Échauffement cardio léger 5 min'),exercises:[
-      cardioEquipmentExercise('25–35 min'),
-      {name:'Relevés de jambes',sets:'4 × 10–15',target:'Abdos bas',how:'Monte contrôlé, redescends sans cambrer.',tips:'Bas du dos stable.',svg:'plank',type:'abdos'},
-      {name:'Mountain climbers contrôlés',sets:'3 × 35–45 sec',target:'Abdos & cardio',how:'Genoux alternés, bassin stable.',tips:'Qualité avant vitesse.',svg:'push',type:'abdos'}
-    ]},
-    Jeudi:{title:'Perso · Mobilité / récupération',duration:'20–30 min',warmup:'Respiration + mobilité douce',exercises:[
-      {name:'Mobilité épaules',sets:'8 min',target:'Épaules',how:'Cercles lents, rotations, ouverture thoracique.',tips:'Important avec anneaux + pompes.',svg:'mobility',type:'mobilite'},
-      {name:'Mobilité poignets',sets:'5 min',target:'Poignets',how:'Flexion/extension douce, appuis progressifs.',tips:'Utile pour supports pompes et anneaux.',svg:'mobility',type:'mobilite'},
-      {name:'Étirements dos/pecs',sets:'10 min',target:'Récupération',how:'Étirements doux, respiration lente.',tips:'Si ça fait mal, arrête.',svg:'mobility',type:'mobilite'}
-    ]},
-    Vendredi:{title:'Perso · Full body hypertrophie',duration:'55–70 min',warmup:'5 min tapis vitesse facile + activation complète',exercises:[
-      {name:equipment.push?'Pompes profondes supports':'Pompes tempo',sets:'5 × 8–15',target:'Pecs, triceps',how:'Amplitude contrôlée, descente lente.',tips:'Arrête 1–2 reps avant l’échec.',svg:'push',type:'compose'},
-      {name:'Bulgarian split squat',sets:'4 × 10–15 / jambe',target:'Jambes, fessiers',how:'Pied arrière sur support, descente contrôlée.',tips:'Très efficace même sans charges lourdes.',svg:'legs',type:'compose'},
-      {name:equipment.rings?'Rowing anneaux':'Rowing haltères tempo',sets:'4 × 10–15',target:'Dos',how:'Tire avec les coudes, serre les omoplates.',tips:'Garde autant de tirage que de poussée.',svg:equipment.rings?'rings':'default',type:'compose'},
-      {name:'Gainage dynamique',sets:'3 × 45 sec',target:'Abdos & gainage',how:'Reste aligné pendant les mouvements.',tips:'Contrôle total.',svg:'plank',type:'gainage'}
-    ]},
-    Samedi:{title:'Perso · Anneaux/supports skill + finition',duration:'35–50 min',warmup:'Échauffement épaules + poignets',exercises:[
-      {name:equipment.rings?'Support hold anneaux':'Support hold sur supports',sets:'5 × 15–30 sec',target:'Stabilité épaules, gainage',how:'Bras verrouillés, épaules basses, corps gainé.',tips:'Travail de contrôle, pas d’échec total.',svg:equipment.rings?'rings':'push',type:'gainage'},
-      {name:equipment.rings?'Ring rows technique':'Pompes scapulaires',sets:'4 × 10–15',target:'Scapulas, dos, posture',how:'Mouvement propre et contrôlé.',tips:'Prévention épaules.',svg:equipment.rings?'rings':'push',type:'compose'},
-      {name:equipment.db?'Finisher épaules/bras 5 kg':'Finisher abdos',sets:'3 tours',target:'Finition musculaire',how:equipment.db?'Élévations, curl, extension triceps en séries longues.':'Crunch, gainage, mountain climbers.',tips:'Brûlure propre, technique stricte.',svg:'default',type:equipment.db?'isolation':'abdos'}
-    ]},
-    Dimanche:{title:'Repos',duration:'—',warmup:'Récupération',exercises:[
-      {name:'Repos',sets:'Récupération',target:'Repos',how:'Hydratation, sommeil, marche légère possible.',tips:'Pas de minuteur : récupération obligatoire.',svg:'rest',type:'repos'}
-    ]}
+const ADAPTIVE_LIBRARY=[
+  {id:'push_easy',name:'Pompes inclinées',movement:'push',target:'Pecs, triceps, gainage',svg:'push',difficulty:'beginner',goals:['muscle','general','fatloss'],how:'Mains surélevées, corps aligné, descente contrôlée.',tips:'Garde 2 répétitions propres en réserve.'},
+  {id:'push_support',name:'Pompes profondes supports tempo',movement:'push',target:'Pecs, triceps',svg:'push',requires:['push'],difficulty:'intermediate',goals:['muscle','strength'],how:'Poignets neutres, descente lente, pause courte en bas.',tips:'Amplitude seulement si épaules confortables.'},
+  {id:'push_rings',name:'Ring push-ups tempo',movement:'push',target:'Pecs, triceps, stabilité',svg:'rings',requires:['rings'],difficulty:'advanced',goals:['muscle','strength'],how:'Anneaux contrôlés, descente 3 sec, remontée propre.',tips:'Stabilité avant amplitude.'},
+  {id:'push_safe',name:'Pompes tempo amplitude confortable',movement:'push',target:'Pecs, triceps',svg:'push',safeFor:['shoulder'],difficulty:'intermediate',goals:['muscle','general'],how:'Amplitude sans gêne, épaules basses, tempo lent.',tips:'Aucune douleur épaule.'},
+  {id:'dip',name:'Dips assistés ou pompes serrées',movement:'push',target:'Triceps, pecs',svg:'dip',avoid:['shoulder'],difficulty:'advanced',goals:['strength','muscle'],how:'Descente contrôlée, épaules basses, aide si besoin.',tips:'Stop si gêne épaule.'},
+
+  {id:'row_rings_easy',name:'Rowing anneaux facile',movement:'pull',target:'Dos, biceps, posture',svg:'rings',requires:['rings'],difficulty:'beginner',goals:['general','muscle'],how:'Corps plutôt vertical, tire la poitrine vers les anneaux.',tips:'Serre les omoplates.'},
+  {id:'row_rings',name:'Rowing anneaux tempo',movement:'pull',target:'Dos, arrière épaules',svg:'rings',requires:['rings'],difficulty:'intermediate',goals:['muscle','strength'],how:'Tire avec les coudes, pause en haut, descente lente.',tips:'Équilibre les pompes avec du tirage.'},
+  {id:'row_db',name:'Rowing haltères tempo',movement:'pull',target:'Dos, arrière épaules',svg:'db',requires:['db'],difficulty:'intermediate',goals:['muscle','general'],how:'Buste stable, coudes vers l’arrière, descente lente.',tips:'Ne tire pas avec le bas du dos.'},
+  {id:'pullup_negative',name:'Tractions négatives assistées',movement:'pull',target:'Dos, biceps',svg:'pull',difficulty:'beginner',goals:['strength','muscle'],how:'Monte avec aide, descends en 3 à 5 sec.',tips:'Peu de reps, mais impeccables.'},
+  {id:'pullup',name:'Tractions progression',movement:'pull',target:'Dos, biceps',svg:'pull',difficulty:'advanced',goals:['strength','muscle'],how:'Tractions strictes, garde une répétition en réserve.',tips:'Progression propre, pas d’élan.'},
+  {id:'curl',name:'Curl haltères contrôlé',movement:'pull',target:'Biceps',svg:'db',requires:['db'],difficulty:'beginner',goals:['muscle'],how:'Coudes fixes, descente lente.',tips:'Le tempo rend 5 kg utiles.'},
+
+  {id:'squat',name:'Squats contrôlés',movement:'legs',target:'Jambes, fessiers',svg:'legs',difficulty:'beginner',goals:['general','fatloss','muscle'],how:'Dos long, genoux stables, amplitude confortable.',tips:'Pause en bas plutôt que vitesse.'},
+  {id:'split',name:'Bulgarian split squat tempo',movement:'legs',target:'Jambes, fessiers',svg:'split',avoid:['knee'],difficulty:'advanced',goals:['muscle','strength'],how:'Descente 3 sec, pause en bas, remontée forte.',tips:'Très efficace sans charge lourde.'},
+  {id:'lunge_safe',name:'Jambes amplitude confortable',movement:'legs',target:'Jambes, mobilité',svg:'legs',safeFor:['knee'],difficulty:'beginner',goals:['general','mobility'],how:'Amplitude réduite si besoin, genoux stables.',tips:'Pas de douleur genou.'},
+
+  {id:'plank_easy',name:'Gainage genoux ou planche courte',movement:'core',target:'Gainage profond',svg:'plank',difficulty:'beginner',goals:['general','mobility'],how:'Ligne propre, respiration calme.',tips:'Stop avant que le dos creuse.'},
+  {id:'plank_rkc',name:'Gainage RKC',movement:'core',target:'Abdos, gainage',svg:'plank',difficulty:'advanced',goals:['strength','muscle'],how:'Contracte fort abdos, fessiers et quadriceps.',tips:'Court mais intense.'},
+  {id:'hollow',name:'Hollow body hold',movement:'core',target:'Abdos, gainage',svg:'hollow',difficulty:'intermediate',goals:['muscle','strength'],how:'Bas du dos collé, jambes tendues si possible.',tips:'Réduis l’amplitude si tu cambres.'},
+  {id:'deadbug',name:'Dead bug contrôlé',movement:'core',target:'Abdos bas, contrôle lombaire',svg:'core',difficulty:'beginner',goals:['mobility','general'],how:'Bas du dos collé, alterne bras/jambe lentement.',tips:'Très bon si le dos est sensible.'},
+
+  {id:'bike',name:'Vélo zone 2',movement:'cardio',target:'Cardio, récupération',svg:'bike',requires:['bike'],difficulty:'beginner',goals:['fatloss','general','mobility'],how:'Rythme régulier, tu dois pouvoir parler.',tips:'Cardio utile sans finir vidé.'},
+  {id:'treadmill',name:'Tapis zone 2',movement:'cardio',target:'Cardio, récupération',svg:'cardio',requires:['treadmill'],difficulty:'beginner',goals:['fatloss','general'],how:'Vitesse confortable, marche rapide ou footing léger.',tips:'Zone 2 : régulier et soutenable.'},
+  {id:'walk',name:'Marche active dehors',movement:'cardio',target:'Cardio, récupération',svg:'cardio',difficulty:'beginner',goals:['fatloss','general','mobility'],how:'Marche active sans impact violent.',tips:'Bouger sans te cramer.'},
+  {id:'mountain',name:'Mountain climbers contrôlés',movement:'cardio',target:'Cardio, abdos',svg:'mountain',avoid:['shoulder'],difficulty:'intermediate',goals:['fatloss','general'],how:'Genoux alternés, bassin stable.',tips:'Ralentis si la technique bouge.'},
+
+  {id:'shoulders',name:'Mobilité épaules',movement:'mobility',target:'Épaules',svg:'mobility',difficulty:'beginner',goals:['mobility','general'],how:'Cercles lents, rotations, ouverture thoracique.',tips:'Aucune douleur.'},
+  {id:'hips',name:'Respiration + mobilité hanches',movement:'mobility',target:'Dos, hanches',svg:'mobility',safeFor:['back'],difficulty:'beginner',goals:['mobility'],how:'Respiration lente, bascule bassin, ouverture douce.',tips:'Cherche le relâchement.'},
+  {id:'wrists',name:'Mobilité poignets',movement:'mobility',target:'Poignets',svg:'mobility',difficulty:'beginner',goals:['mobility','general'],how:'Flexion/extension douce, appuis progressifs.',tips:'Utile pour supports et anneaux.'}
+];
+
+function adaptiveContext(){
+  const diff=customDifficulty();
+  const feedback=feedbackAdjustment();
+  return {
+    goal:customProfile.goal||'muscle',
+    focus:customProfile.focus||'balanced',
+    limitation:feedback.avoidPain ? 'shoulder' : (customProfile.limitation||'none'),
+    feedback:feedback.value,
+    avoidPain:feedback.avoidPain,
+    sessions:customNumber('sessions',4),
+    minutes:customNumber('sessionTime',45),
+    difficulty:diff,
+    pushups:customNumber('pushups',10),
+    pullups:Number(customProfile.pullups)||0,
+    plank:customNumber('plank',30)
   };
-  const adapted=adaptPersonalProgramToCustom(p);
-  Object.values(adapted).forEach(day=>day.exercises.forEach(ex=>{
-    const d=DUR[ex.type]||DUR.compose;
-    ex.effort=scaleSeconds(d.effort,false);
-    ex.rest=scaleSeconds(d.rest,true);
-  }));
-  return adapted;
+}
+
+function difficultyRank(v){return {beginner:1,intermediate:2,advanced:3}[v]||2}
+function equipmentOk(item){
+  return !(item.requires||[]).some(k=>!equipment[k]);
+}
+function limitationOk(item,ctx){
+  return !(item.avoid||[]).includes(ctx.limitation);
+}
+function adaptiveScore(item,slot,ctx,used){
+  if(item.movement!==slot)return -999;
+  if(!equipmentOk(item) || !limitationOk(item,ctx))return -999;
+  if(used.has(item.id))return -60;
+  let score=0;
+  const diffGap=Math.abs(difficultyRank(item.difficulty)-difficultyRank(ctx.difficulty));
+  score-=diffGap*10;
+  if((item.goals||[]).includes(ctx.goal))score+=18;
+  if(item.safeFor&&item.safeFor.includes(ctx.limitation))score+=28;
+  if(ctx.focus===slot)score+=24;
+  if(ctx.focus==='pull'&&slot==='pull')score+=12;
+  if(ctx.focus==='core'&&slot==='core')score+=12;
+  if(ctx.pullups<1 && item.id==='pullup_negative')score+=20;
+  if(ctx.pullups>=5 && item.id==='pullup')score+=22;
+  if(ctx.pushups<8 && item.id==='push_easy')score+=18;
+  if(ctx.goal==='fatloss'&&slot==='cardio')score+=20;
+  if(ctx.goal==='mobility'&&(slot==='mobility'||item.safeFor))score+=18;
+  if(ctx.feedback==='easy' && item.difficulty==='advanced')score+=10;
+  if(ctx.feedback==='hard' && item.difficulty==='beginner')score+=10;
+  if(ctx.avoidPain && item.safeFor)score+=16;
+  return score;
+}
+
+function chooseAdaptiveExercise(slot,ctx,used){
+  const sorted=ADAPTIVE_LIBRARY
+    .map(item=>({item,score:adaptiveScore(item,slot,ctx,used)}))
+    .filter(x=>x.score>-900)
+    .sort((a,b)=>b.score-a.score);
+  const pick=(sorted[0]&&sorted[0].item) || ADAPTIVE_LIBRARY.find(x=>x.movement===slot) || ADAPTIVE_LIBRARY[0];
+  used.add(pick.id);
+  return makeAdaptiveExercise(pick,ctx);
+}
+
+function adaptiveSetsFor(item,ctx){
+  const short=ctx.minutes<=30;
+  const advanced=ctx.difficulty==='advanced';
+  const strength=ctx.goal==='strength';
+  if(item.movement==='cardio')return ctx.minutes>=60?'30–40 min':(short?'15–20 min':'20–30 min');
+  if(item.movement==='mobility')return short?'6–8 min':'8–12 min';
+  if(item.movement==='core')return advanced?'4 × 35–50 sec':(short?'2–3 × 20–35 sec':'3 × 30–45 sec');
+  if(item.movement==='legs')return strength?(advanced?'5 × 6–10':'4 × 6–10'):(short?'3 × 10–12':'4 × 10–15');
+  if(item.movement==='pull' && /Tractions/.test(item.name))return advanced?'5 × 3–6':'4 × 2–5';
+  if(strength)return advanced?'5 × 5–8':'4 × 5–8';
+  return advanced&&!short?'5 × 8–15':(short?'3 × 8–12':'4 × 8–15');
+}
+
+function makeAdaptiveExercise(item,ctx){
+  const ex={
+    name:item.name,
+    sets:adaptiveSetsFor(item,ctx),
+    target:item.target,
+    how:item.how,
+    tips:item.tips,
+    svg:item.svg,
+    type:item.movement==='mobility'||item.movement==='cardio'?'mobilite':(item.movement==='core'?'gainage':'compose')
+  };
+  const d=DUR[ex.type]||DUR.compose;
+  ex.effort=scaleSeconds(item.movement==='cardio'?1200:d.effort,false);
+  ex.rest=scaleSeconds(item.movement==='cardio'?60:d.rest,true);
+  return ex;
+}
+
+function adaptiveDay(day,title,slots,ctx,used){
+  const exercises=slots.map(slot=>chooseAdaptiveExercise(slot,ctx,used));
+  return {
+    title,
+    duration:ctx.minutes<=30?'25–35 min':(ctx.minutes>=60?'55–70 min':'40–55 min'),
+    warmup:slots.includes('cardio')?'5 min facile + mobilité articulaire':'5 min mobilité + activation progressive',
+    exercises
+  };
+}
+
+function restDay(title='Repos'){
+  return {title,duration:'—',warmup:'Récupération',exercises:[
+    {name:'Repos',sets:'Récupération',target:'Repos',how:'Hydratation, sommeil, marche légère possible.',tips:'Le repos fait partie du programme.',svg:'rest',type:'repos',effort:0,rest:0}
+  ]};
+}
+
+function buildAdaptivePersonalProgram(){
+  const ctx=adaptiveContext();
+  const used=new Set();
+  const plan={
+    Lundi:adaptiveDay('Lundi','Perso · '+customGoalLabel()+' · Push',['push','push','pull','core'],ctx,used),
+    Mardi:adaptiveDay('Mardi','Perso · Pull · posture',['pull','pull','push','core'],ctx,used),
+    Mercredi:adaptiveDay('Mercredi','Perso · Cardio · Core',['cardio','core','mobility'],ctx,used),
+    Jeudi:adaptiveDay('Jeudi','Perso · Mobilité · récupération',['mobility','mobility','core'],ctx,used),
+    Vendredi:adaptiveDay('Vendredi','Perso · Full body',['push','legs','pull','core'],ctx,used),
+    Samedi:adaptiveDay('Samedi','Perso · Circuit ciblé',['push','legs','pull','cardio'],ctx,used),
+    Dimanche:restDay()
+  };
+
+  if(ctx.sessions<=3){
+    plan.Mardi=restDay('Repos actif');
+    plan.Jeudi=adaptiveDay('Jeudi','Perso · Mobilité courte',['mobility','core'],ctx,used);
+    plan.Samedi=restDay();
+  }else if(ctx.sessions===4){
+    plan.Samedi=restDay();
+  }else if(ctx.sessions>=6){
+    plan.Jeudi=adaptiveDay('Jeudi','Perso · Mobilité + cardio doux',['mobility','cardio','core'],ctx,used);
+  }
+
+  if(ctx.goal==='fatloss'){
+    plan.Samedi=adaptiveDay('Samedi','Perso · Cardio + circuit propre',['cardio','legs','push','core'],ctx,used);
+  }
+  if(ctx.goal==='mobility'){
+    plan.Mercredi=adaptiveDay('Mercredi','Perso · Mobilité active',['mobility','mobility','cardio'],ctx,used);
+    plan.Samedi=ctx.sessions>=5?adaptiveDay('Samedi','Perso · mobilité + gainage',['mobility','core','cardio'],ctx,used):plan.Samedi;
+  }
+
+  return normalizeCircuits(improveProgramText(applyEquipmentAdaptation(normalizeProgramSvgs(plan))));
+}
+
+function buildPersonalProgram(){
+  return buildAdaptivePersonalProgram();
 }
 
 
@@ -1624,6 +1807,16 @@ function coachAdvice(){
 }
 function escapeHTML(v){
   return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});
+}
+function tutorialSearchQuery(ex){
+  const name=(ex&&ex.name)||'exercice';
+  const target=(ex&&ex.target)||'';
+  return 'tuto '+name+' technique '+target;
+}
+function tutorialLinkHTML(ex){
+  if(!ex || ex.type==='repos')return '';
+  const url='https://www.youtube.com/results?search_query='+encodeURIComponent(tutorialSearchQuery(ex));
+  return '<a class="tutorial-link" href="'+url+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Voir un tuto YouTube</a>';
 }
 function formatHistoryDate(key){
   const d=dateFromKey(key);
@@ -2154,7 +2347,14 @@ function profilePillLabel(){
   return levelLabel;
 }
 
-function renderAll(){updateSessionRunner();if(typeof renderEquipment==='function')renderEquipment();if(typeof renderStats==='function')renderStats();renderTimerDaySelect();renderChoices();renderDays();renderInfo();renderExercises();renderExerciseLibrary();renderWeek();document.getElementById('profile-pill').textContent=profilePillLabel();document.getElementById('tip-mode').textContent=timerModeLabel ? timerModeLabel() : profilePillLabel()}
+function renderAllImpl(){updateSessionRunner();if(typeof renderEquipment==='function')renderEquipment();if(typeof renderStats==='function')renderStats();renderTimerDaySelect();renderChoices();renderDays();renderInfo();renderExercises();renderExerciseLibrary();renderWeek();document.getElementById('profile-pill').textContent=profilePillLabel();document.getElementById('tip-mode').textContent=timerModeLabel ? timerModeLabel() : profilePillLabel()}
+
+// Wrapper with memoization to prevent duplicate renders
+function renderAll() {
+  if (shouldRender()) {
+    renderAllImpl();
+  }
+}
 function renderDays(){document.getElementById('day-scroller').innerHTML=DAYS.map(d=>`<button class="day-chip ${d===currentDay?'active':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);renderAll()">${d}</button>`).join('')}
 
 let guidedSession=null;
@@ -2245,7 +2445,22 @@ function programHeroHTML(){
     '<div class="program-hero-progress"><div style="width:'+info.pct+'%"></div></div>'+
     '<div class="program-hero-next">'+(next?'Prochain : '+escapeHTML(next.name):'Séance terminée')+'</div>'+
     '<button class="program-main-action" type="button" '+(info.pct>=100?'disabled':'onclick="startTodaySession()"')+'>'+(info.pct>=100?'Séance terminée':buttonLabel)+'</button>'+
+    (info.pct>=100?sessionFeedbackHTML():'')+
   '</div>';
+}
+
+function sessionFeedbackHTML(){
+  const fb=getSessionFeedback(currentDay);
+  const selected=fb&&fb.value;
+  const items=[
+    ['easy','Trop facile'],
+    ['good','Bien'],
+    ['hard','Trop dur'],
+    ['pain','Douleur']
+  ];
+  return '<div class="session-feedback"><div class="session-feedback-title">Ressenti de séance</div><div class="session-feedback-grid">'+
+    items.map(([value,label])=>'<button type="button" class="'+(selected===value?'active':'')+'" onclick="saveSessionFeedback(\''+value+'\')">'+label+'</button>').join('')+
+  '</div><div class="session-feedback-note">'+(selected?'Pris en compte pour adapter la suite.':'Ton choix adapte les prochaines séances Perso.')+'</div></div>';
 }
 
 function startTodaySession(){
@@ -2512,7 +2727,7 @@ function renderExercises(){
     const visualKey=chooseExerciseVisual(ex);
     const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
     const checkLabel=ex.type==='repos'?'Valider le repos':'Valider l’exercice';
-    return `<div class="ex-card ${ex.type==='repos'?'rest-card':''} ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div><div class="ex-meta"><strong>Cible :</strong> ${ex.target}<br><strong>Comment faire :</strong> ${ex.how}<br><strong>Conseil :</strong> ${ex.tips}</div>${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
+    return `<div class="ex-card ${ex.type==='repos'?'rest-card':''} ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div><div class="ex-meta"><strong>Cible :</strong> ${ex.target}<br><strong>Comment faire :</strong> ${ex.how}<br><strong>Conseil :</strong> ${ex.tips}</div>${tutorialLinkHTML(ex)}${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
   }).join('');
 }
 
@@ -2591,6 +2806,7 @@ function renderExerciseLibrary(){
       <div class="ex-body">
         <div class="ex-visual" data-visual="${visualKey}">${visual}</div>
         <div class="ex-meta"><strong>Cible :</strong> ${ex.target||'—'}<br><strong>Comment faire :</strong> ${ex.how||'Fais le mouvement avec contrôle.'}<br><strong>Conseil :</strong> ${ex.tips||'Garde une technique propre.'}</div>
+        ${tutorialLinkHTML(ex)}
         <div class="ex-timer-line">${timing}</div>
         ${circuitHTML(ex)}
       </div>
