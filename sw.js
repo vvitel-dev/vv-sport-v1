@@ -1,4 +1,4 @@
-const CACHE_NAME='vv-sport-exercises-profile-timer-v16';
+const CACHE_NAME='vv-sport-exercises-profile-timer-v18';
 const ASSETS=[
   './',
   './index.html',
@@ -17,6 +17,18 @@ self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promis
 self.addEventListener('message',e=>{if(e.data&&e.data.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
+  const url=new URL(e.request.url);
+  const freshAsset=url.pathname.endsWith('/app.js') || url.pathname.endsWith('/styles.css') || url.pathname.endsWith('/index.html') || e.request.mode==='navigate';
+  if(freshAsset){
+    e.respondWith(
+      fetch(e.request).then(response=>{
+        const copy=response.clone();
+        caches.open(CACHE_NAME).then(cache=>cache.put(e.request,copy));
+        return response;
+      }).catch(()=>caches.match(e.request).then(cached=>cached||caches.match('./index.html')))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached=>{
       if(cached)return cached;

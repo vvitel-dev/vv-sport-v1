@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#111111">
+<meta name="theme-color" content="#10130f">
 <meta name="description" content="vV Sport, programme personnel de musculation, calisthenie, abdos, minuteur et suivi de progression.">
 <meta name="format-detection" content="telephone=no">
 <title>vV Sport</title>
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon-192.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
@@ -21,7 +21,7 @@
 <div id="launch-screen" class="launch-screen">
   <div class="launch-card">
     <div class="launch-kicker">Programme perso</div>
-    <h1>vV Sport</h1>
+    <h1 id="launch-title">vV Sport</h1>
     <p class="launch-sub">
       Ton programme du jour, adapté à ton niveau et au matériel disponible.
     </p>
@@ -39,7 +39,10 @@
 
 
 <div id="setup-screen" class="setup hidden">
-  <div class="setup-title">vV Sport</div>
+  <label class="app-name-field">
+    <span>Profil</span>
+    <input id="setup-app-name" type="text" value="vV Sport" maxlength="28" autocomplete="off" oninput="setAppName(this.value)" onblur="setAppName(this.value)">
+  </label>
   <div class="setup-sub">Choisis ton niveau et le matériel disponible. Tu peux changer à tout moment dans Options.</div>
   <div class="setup-label">Niveau</div>
   <div class="choice-grid" id="level-choices"></div>
@@ -49,7 +52,7 @@
 
 <main id="app-screen" class="hidden">
   <div id="tab-program" class="tab-page active">
-    <div class="page-header"><div class="page-title">Programme</div><div class="page-sub">Aujourd’hui · Semaine</div><div class="profile-pill" id="profile-pill"></div></div>
+    <div class="page-header app-page-hero"><div><div class="page-title">Programme</div><div class="page-sub">Aujourd’hui · Semaine</div></div><div class="profile-pill" id="profile-pill"></div></div>
     <div class="program-switch" role="tablist" aria-label="Vue du programme">
       <button class="program-switch-btn active" id="program-view-today" type="button" onclick="showProgramView('today')">Aujourd’hui</button>
       <button class="program-switch-btn" id="program-view-week" type="button" onclick="showProgramView('week')">Semaine</button>
@@ -65,7 +68,7 @@
     </section>
   </div>
   <div id="tab-exercises" class="hidden tab-page" style="display:none">
-    <div class="page-header"><div class="page-title">Exercices</div><div class="page-sub">Bibliothèque complète · lancer un exercice seul</div></div>
+    <div class="page-header app-page-hero"><div><div class="page-title">Exercices</div><div class="page-sub">Bibliothèque complète · lancer un exercice seul</div></div></div>
     <div class="section-label">Profil rapide</div>
     <div id="exercise-profile-quick" class="exercise-profile-quick"></div>
     <div class="section-label">Tous les exercices</div>
@@ -73,7 +76,7 @@
   </div>
 
   <div id="tab-timer" class="hidden tab-page" style="display:none">
-    <div class="page-header"><div class="page-title">Minuteur</div><div class="page-sub">Adapté à l’exercice sélectionné</div></div>
+    <div class="page-header app-page-hero"><div><div class="page-title">Minuteur</div><div class="page-sub">Adapté à l’exercice sélectionné</div></div></div>
     <div class="session-runner-card hidden" id="session-runner-card">
       <div class="session-runner-head">
         <span>Séance guidée</span>
@@ -100,6 +103,10 @@
           <option value="10">10s</option>
           <option value="15">15s</option>
         </select>
+      </div>
+      <div class="timer-color-preset-panel">
+        <span>Couleur</span>
+        <div class="timer-color-preset" id="timer-color-preset"></div>
       </div>
       <div class="timer-status" id="timer-status-label" aria-live="polite">En attente</div>
       <div class="timer-phase" id="timer-phase" aria-live="polite">PRÊT</div>
@@ -130,7 +137,6 @@
         <div class="page-title">Stats</div>
         <div class="page-sub">Progression, régularité et historique</div>
       </div>
-      <button class="stats-reset-btn" type="button" onclick="resetStats()">Reset stats</button>
     </div>
 
     <div class="stats-grid">
@@ -157,6 +163,9 @@
 
     <div class="section-label">Historique par jour</div>
     <div class="history-list" id="history-list"></div>
+    <div class="stats-reset-footer">
+      <button class="stats-reset-btn" type="button" onclick="resetStats()">Reset stats</button>
+    </div>
   </div>
 
   <section id="tab-options" class="tab-page" hidden style="display:none">

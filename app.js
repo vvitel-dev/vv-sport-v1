@@ -50,6 +50,100 @@ function shouldRender() {
 }
 
 const APP_VERSION='1.2.0';
+let appName=storageSafe.getItem('vv-app-name')||'vV Sport';
+function cleanAppName(value){
+  const name=String(value||'').trim().replace(/\s+/g,' ');
+  return name || 'vV Sport';
+}
+function updateAppNameUI(){
+  const name=cleanAppName(appName);
+  appName=name;
+  const launchTitle=document.getElementById('launch-title');
+  const setupInput=document.getElementById('setup-app-name');
+  if(launchTitle)launchTitle.textContent=name;
+  if(setupInput && setupInput.value!==name)setupInput.value=name;
+  document.title=name;
+}
+function setAppName(value){
+  appName=cleanAppName(value);
+  storageSafe.setItem('vv-app-name',appName);
+  updateAppNameUI();
+}
+const COLOR_THEMES={
+  lime:{label:'Lime',accent:'#bdf45b',dim:'rgba(189,244,91,.10)',accent2:'#74d7e7',accent3:'#e9bd65',bg:'#0b0d0c',gradient:'linear-gradient(135deg,#d9ff63 0%,#9be84a 48%,#67e8f9 100%)'},
+  ocean:{label:'Ocean',accent:'#67e8f9',dim:'rgba(103,232,249,.11)',accent2:'#bdf45b',accent3:'#60a5fa',bg:'#091012',gradient:'linear-gradient(135deg,#67e8f9 0%,#38bdf8 52%,#8b5cf6 100%)'},
+  sunset:{label:'Sunset',accent:'#f2c36b',dim:'rgba(242,195,107,.12)',accent2:'#fb7185',accent3:'#f97316',bg:'#100d0a',gradient:'linear-gradient(135deg,#facc15 0%,#fb923c 48%,#fb7185 100%)'},
+  rose:{label:'Rose',accent:'#fb7185',dim:'rgba(251,113,133,.12)',accent2:'#f0abfc',accent3:'#f2c36b',bg:'#100b0d',gradient:'linear-gradient(135deg,#fb7185 0%,#f472b6 48%,#a78bfa 100%)'},
+  violet:{label:'Violet',accent:'#a78bfa',dim:'rgba(167,139,250,.13)',accent2:'#67e8f9',accent3:'#f2c36b',bg:'#0e0c13',gradient:'linear-gradient(135deg,#a78bfa 0%,#7c3aed 50%,#67e8f9 100%)'}
+};
+let colorThemeKey=storageSafe.getItem('vv-color-theme')||'lime';
+const TIMER_PRESET_COLORS={
+  auto:{label:'Auto',color:''},
+  lime:{label:'Lime',color:'#bdf45b'},
+  cyan:{label:'Cyan',color:'#67e8f9'},
+  violet:{label:'Violet',color:'#a78bfa'},
+  amber:{label:'Ambre',color:'#f2c36b'},
+  rose:{label:'Rose',color:'#fb7185'}
+};
+let timerPresetColorKey=storageSafe.getItem('vv-timer-preset-color')||'auto';
+function applyColorTheme(key=colorThemeKey){
+  const theme=COLOR_THEMES[key]||COLOR_THEMES.lime;
+  colorThemeKey=COLOR_THEMES[key]?key:'lime';
+  const root=document.documentElement;
+  root.style.setProperty('--accent',theme.accent);
+  root.style.setProperty('--accent-dim',theme.dim);
+  root.style.setProperty('--accent-2',theme.accent2);
+  root.style.setProperty('--accent-3',theme.accent3);
+  root.style.setProperty('--accent-gradient',theme.gradient);
+  root.style.setProperty('--profile-color',theme.accent);
+  root.style.setProperty('--bg',theme.bg);
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.setAttribute('content',theme.bg);
+}
+function timerColorForProfile(){
+  if(timerPresetColorKey&&timerPresetColorKey!=='auto'&&TIMER_PRESET_COLORS[timerPresetColorKey]){
+    return TIMER_PRESET_COLORS[timerPresetColorKey].color;
+  }
+  if(profile&&profile.level==='debutant')return '#67e8f9';
+  if(profile&&profile.level==='medium')return '#bdf45b';
+  if(profile&&profile.level==='expert')return '#a78bfa';
+  if(profile&&profile.level==='perso')return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#bdf45b';
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#bdf45b';
+}
+function applyTimerColor(){
+  document.documentElement.style.setProperty('--timer-color',timerColorForProfile());
+}
+function setTimerPresetColor(key){
+  if(!TIMER_PRESET_COLORS[key])return;
+  timerPresetColorKey=key;
+  storageSafe.setItem('vv-timer-preset-color',key);
+  applyTimerColor();
+  renderTimerColorPreset();
+}
+function renderTimerColorPreset(){
+  const box=document.getElementById('timer-color-preset');
+  if(!box)return;
+  box.innerHTML=Object.entries(TIMER_PRESET_COLORS).map(([key,item])=>
+    '<button class="timer-color-dot '+(timerPresetColorKey===key?'active':'')+'" type="button" onclick="setTimerPresetColor(\''+key+'\')" title="'+escapeHTML(item.label)+'" aria-label="Couleur minuteur '+escapeHTML(item.label)+'" aria-pressed="'+(timerPresetColorKey===key?'true':'false')+'" style="--timer-choice:'+(item.color||'var(--timer-color,var(--accent))')+'">'+
+      '<span></span>'+
+    '</button>'
+  ).join('');
+}
+function setColorTheme(key){
+  if(!COLOR_THEMES[key])return;
+  storageSafe.setItem('vv-color-theme',key);
+  applyColorTheme(key);
+  applyTimerColor();
+  if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
+}
+function colorThemeOptionsHTML(){
+  return '<div class="theme-grid">'+Object.entries(COLOR_THEMES).map(([key,theme])=>
+    '<button class="theme-choice '+(colorThemeKey===key?'active':'')+'" type="button" onclick="setColorTheme(\''+key+'\')" aria-pressed="'+(colorThemeKey===key?'true':'false')+'" style="--swatch:'+theme.accent+';--swatch-gradient:'+theme.gradient+'">'+
+      '<span class="theme-swatch" aria-hidden="true"></span>'+
+      '<span class="theme-choice-copy"><strong>'+escapeHTML(theme.label)+'</strong></span>'+
+    '</button>'
+  ).join('')+'</div>';
+}
 let currentTab=storageSafe.getItem('vv-current-tab')||'program';
 let programView=storageSafe.getItem('vv-program-view')||'today';
 if(currentTab==='today'||currentTab==='week'){
@@ -697,6 +791,11 @@ function renderEquipment(){
  });
 }let currentDay=(typeof getRealDay==='function'?getRealDay():'Lundi');let activeTab='today';
 let timer={seconds:90,left:90,interval:null,running:false,phase:'manual',exercise:null,exerciseData:null,effort:90,rest:0,totalPhase:90,prep:5,pendingStart:false,circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};
+let timerTune={
+  effort:Math.max(15,Number(storageSafe.getItem('vv-timer-tune-effort'))||90),
+  rest:Math.max(0,Number(storageSafe.getItem('vv-timer-tune-rest'))||30),
+  prep:Math.max(0,Number(storageSafe.getItem('vv-timer-tune-prep'))||5)
+};
 function clone(o){return JSON.parse(JSON.stringify(o))}
 
 
@@ -1284,6 +1383,10 @@ const ADAPTIVE_LIBRARY=[
   {id:'push_rings',name:'Ring push-ups tempo',movement:'push',target:'Pecs, triceps, stabilité',svg:'rings',requires:['rings'],difficulty:'advanced',goals:['muscle','strength'],how:'Anneaux contrôlés, descente 3 sec, remontée propre.',tips:'Stabilité avant amplitude.'},
   {id:'push_safe',name:'Pompes tempo amplitude confortable',movement:'push',target:'Pecs, triceps',svg:'push',safeFor:['shoulder'],difficulty:'intermediate',goals:['muscle','general'],how:'Amplitude sans gêne, épaules basses, tempo lent.',tips:'Aucune douleur épaule.'},
   {id:'dip',name:'Dips assistés ou pompes serrées',movement:'push',target:'Triceps, pecs',svg:'dip',avoid:['shoulder'],difficulty:'advanced',goals:['strength','muscle'],how:'Descente contrôlée, épaules basses, aide si besoin.',tips:'Stop si gêne épaule.'},
+  {id:'push_knee',name:'Pompes genoux tempo',movement:'push',target:'Pecs, triceps, gainage',svg:'push',safeFor:['shoulder'],difficulty:'beginner',goals:['general','muscle'],how:'Genoux au sol, bassin aligné, descends lentement puis pousse proprement.',tips:'Garde le même alignement épaules-hanches-genoux.'},
+  {id:'push_close',name:'Pompes serrées inclinées',movement:'push',target:'Triceps, pecs',svg:'push',avoid:['shoulder'],difficulty:'intermediate',goals:['muscle','strength'],how:'Mains rapprochées sur support, coudes près du corps, tempo contrôlé.',tips:'Très utile pour les triceps sans forcer les épaules.'},
+  {id:'pike_push',name:'Pike push-ups tempo',movement:'push',target:'Épaules, triceps',svg:'pike',avoid:['shoulder'],difficulty:'advanced',goals:['strength','muscle'],how:'Hanches hautes, tête descend vers le sol, pousse verticalement.',tips:'Amplitude courte si les épaules ne sont pas parfaitement calmes.'},
+  {id:'support_hold',name:'Support hold sur supports',movement:'push',target:'Triceps, épaules, gainage',svg:'dip',requires:['push'],avoid:['shoulder'],difficulty:'intermediate',goals:['strength','general'],how:'Bras tendus sur supports, épaules basses, tiens le corps solide.',tips:'Travail de stabilité avant les dips.'},
 
   {id:'row_rings_easy',name:'Rowing anneaux facile',movement:'pull',target:'Dos, biceps, posture',svg:'rings',requires:['rings'],difficulty:'beginner',goals:['general','muscle'],how:'Corps plutôt vertical, tire la poitrine vers les anneaux.',tips:'Serre les omoplates.'},
   {id:'row_rings',name:'Rowing anneaux tempo',movement:'pull',target:'Dos, arrière épaules',svg:'rings',requires:['rings'],difficulty:'intermediate',goals:['muscle','strength'],how:'Tire avec les coudes, pause en haut, descente lente.',tips:'Équilibre les pompes avec du tirage.'},
@@ -1291,24 +1394,43 @@ const ADAPTIVE_LIBRARY=[
   {id:'pullup_negative',name:'Tractions négatives assistées',movement:'pull',target:'Dos, biceps',svg:'pull',difficulty:'beginner',goals:['strength','muscle'],how:'Monte avec aide, descends en 3 à 5 sec.',tips:'Peu de reps, mais impeccables.'},
   {id:'pullup',name:'Tractions progression',movement:'pull',target:'Dos, biceps',svg:'pull',difficulty:'advanced',goals:['strength','muscle'],how:'Tractions strictes, garde une répétition en réserve.',tips:'Progression propre, pas d’élan.'},
   {id:'curl',name:'Curl haltères contrôlé',movement:'pull',target:'Biceps',svg:'db',requires:['db'],difficulty:'beginner',goals:['muscle'],how:'Coudes fixes, descente lente.',tips:'Le tempo rend 5 kg utiles.'},
+  {id:'row_db_supported',name:'Rowing haltère appuyé',movement:'pull',target:'Dos, biceps, posture',svg:'db',requires:['db'],safeFor:['back'],difficulty:'beginner',goals:['general','muscle'],how:'Une main appuyée, dos stable, tire le coude vers la hanche.',tips:'Variante propre si le bas du dos fatigue.'},
+  {id:'face_pull_rings',name:'Face pull aux anneaux',movement:'pull',target:'Arrière épaules, posture',svg:'rings',requires:['rings'],difficulty:'intermediate',goals:['general','mobility','muscle'],how:'Tire les anneaux vers le visage, coudes hauts, omoplates serrées.',tips:'Léger, précis, excellent pour la posture.'},
+  {id:'scap_pull',name:'Suspension scapulaire',movement:'pull',target:'Dos, épaules basses',svg:'pull',difficulty:'intermediate',goals:['strength','mobility'],how:'Suspendu, bras tendus, descends les épaules puis relâche lentement.',tips:'Prépare les tractions sans tirer avec les bras.'},
+  {id:'reverse_fly_db',name:'Oiseau haltères tempo',movement:'pull',target:'Arrière épaules, haut du dos',svg:'db',requires:['db'],difficulty:'beginner',goals:['muscle','general'],how:'Buste incliné, bras ouverts, mouvement petit et contrôlé.',tips:'Pas d’élan, pense posture.'},
 
   {id:'squat',name:'Squats contrôlés',movement:'legs',target:'Jambes, fessiers',svg:'legs',difficulty:'beginner',goals:['general','fatloss','muscle'],how:'Dos long, genoux stables, amplitude confortable.',tips:'Pause en bas plutôt que vitesse.'},
   {id:'split',name:'Bulgarian split squat tempo',movement:'legs',target:'Jambes, fessiers',svg:'split',avoid:['knee'],difficulty:'advanced',goals:['muscle','strength'],how:'Descente 3 sec, pause en bas, remontée forte.',tips:'Très efficace sans charge lourde.'},
   {id:'lunge_safe',name:'Jambes amplitude confortable',movement:'legs',target:'Jambes, mobilité',svg:'legs',safeFor:['knee'],difficulty:'beginner',goals:['general','mobility'],how:'Amplitude réduite si besoin, genoux stables.',tips:'Pas de douleur genou.'},
+  {id:'reverse_lunge',name:'Fentes arrière contrôlées',movement:'legs',target:'Jambes, fessiers, équilibre',svg:'legs',avoid:['knee'],difficulty:'intermediate',goals:['muscle','general'],how:'Grand pas arrière, buste stable, pousse dans le sol pour remonter.',tips:'La fente arrière est souvent plus douce pour les genoux.'},
+  {id:'glute_bridge',name:'Pont fessier tempo',movement:'legs',target:'Fessiers, ischios, bas du dos',svg:'legs',safeFor:['knee','back'],difficulty:'beginner',goals:['general','muscle','mobility'],how:'Talons au sol, monte le bassin, serre les fessiers 1 sec en haut.',tips:'Simple, efficace, peu stressant.'},
+  {id:'calf_raise',name:'Mollets debout tempo',movement:'legs',target:'Mollets, chevilles',svg:'legs',difficulty:'beginner',goals:['general','muscle'],how:'Monte sur la pointe des pieds, pause en haut, descente lente.',tips:'Tiens un support pour rester stable.'},
+  {id:'wall_sit',name:'Chaise au mur',movement:'legs',target:'Quadriceps, gainage',svg:'legs',safeFor:['back'],difficulty:'intermediate',goals:['strength','fatloss','general'],how:'Dos au mur, genoux confortables, tiens sans rebond.',tips:'Arrête avant que la posture se dégrade.'},
 
   {id:'plank_easy',name:'Gainage genoux ou planche courte',movement:'core',target:'Gainage profond',svg:'plank',difficulty:'beginner',goals:['general','mobility'],how:'Ligne propre, respiration calme.',tips:'Stop avant que le dos creuse.'},
   {id:'plank_rkc',name:'Gainage RKC',movement:'core',target:'Abdos, gainage',svg:'plank',difficulty:'advanced',goals:['strength','muscle'],how:'Contracte fort abdos, fessiers et quadriceps.',tips:'Court mais intense.'},
   {id:'hollow',name:'Hollow body hold',movement:'core',target:'Abdos, gainage',svg:'hollow',difficulty:'intermediate',goals:['muscle','strength'],how:'Bas du dos collé, jambes tendues si possible.',tips:'Réduis l’amplitude si tu cambres.'},
   {id:'deadbug',name:'Dead bug contrôlé',movement:'core',target:'Abdos bas, contrôle lombaire',svg:'core',difficulty:'beginner',goals:['mobility','general'],how:'Bas du dos collé, alterne bras/jambe lentement.',tips:'Très bon si le dos est sensible.'},
+  {id:'side_plank',name:'Gainage latéral',movement:'core',target:'Obliques, stabilité bassin',svg:'plank',difficulty:'intermediate',goals:['general','strength','muscle'],how:'Coude sous l’épaule, corps aligné, tiens sans laisser tomber le bassin.',tips:'Commence sur les genoux si besoin.'},
+  {id:'shoulder_taps',name:'Shoulder taps contrôlés',movement:'core',target:'Gainage, épaules, anti-rotation',svg:'shoulder_tap',avoid:['shoulder'],difficulty:'intermediate',goals:['general','strength'],how:'En planche, touche une épaule puis l’autre sans bouger le bassin.',tips:'Lent et stable vaut mieux que rapide.'},
+  {id:'crunch_control',name:'Crunch contrôlé',movement:'core',target:'Abdos',svg:'crunch',difficulty:'beginner',goals:['general','muscle'],how:'Expire en remontant légèrement, redescends lentement.',tips:'Ne tire jamais sur la nuque.'},
+  {id:'leg_raise',name:'Relevés de jambes tempo',movement:'core',target:'Abdos bas',svg:'core',avoid:['back'],difficulty:'advanced',goals:['strength','muscle'],how:'Monte contrôlé, bloque 1 sec, descends sans cambrer.',tips:'Plie les genoux si le bas du dos décolle.'},
 
   {id:'bike',name:'Vélo zone 2',movement:'cardio',target:'Cardio, récupération',svg:'bike',requires:['bike'],difficulty:'beginner',goals:['fatloss','general','mobility'],how:'Rythme régulier, tu dois pouvoir parler.',tips:'Cardio utile sans finir vidé.'},
   {id:'treadmill',name:'Tapis zone 2',movement:'cardio',target:'Cardio, récupération',svg:'cardio',requires:['treadmill'],difficulty:'beginner',goals:['fatloss','general'],how:'Vitesse confortable, marche rapide ou footing léger.',tips:'Zone 2 : régulier et soutenable.'},
   {id:'walk',name:'Marche active dehors',movement:'cardio',target:'Cardio, récupération',svg:'cardio',difficulty:'beginner',goals:['fatloss','general','mobility'],how:'Marche active sans impact violent.',tips:'Bouger sans te cramer.'},
   {id:'mountain',name:'Mountain climbers contrôlés',movement:'cardio',target:'Cardio, abdos',svg:'mountain',avoid:['shoulder'],difficulty:'intermediate',goals:['fatloss','general'],how:'Genoux alternés, bassin stable.',tips:'Ralentis si la technique bouge.'},
+  {id:'bike_intervals',name:'Vélo intervalles doux',movement:'cardio',target:'Cardio, souffle',svg:'bike',requires:['bike'],difficulty:'intermediate',goals:['fatloss','general'],how:'Alterne 40 sec soutenu et 80 sec facile, sans sprint violent.',tips:'Tu dois finir mieux, pas explosé.'},
+  {id:'treadmill_incline',name:'Marche inclinée tapis',movement:'cardio',target:'Cardio, jambes, perte de gras',svg:'cardio',requires:['treadmill'],difficulty:'beginner',goals:['fatloss','general'],how:'Inclinaison modérée, pas rapide, posture haute.',tips:'Excellent cardio sans impact de course.'},
+  {id:'step_jacks',name:'Step jacks sans saut',movement:'cardio',target:'Cardio doux, coordination',svg:'cardio',safeFor:['knee'],difficulty:'beginner',goals:['fatloss','general','mobility'],how:'Un pied sort sur le côté puis revient, bras actifs, sans saut.',tips:'Option cardio quand tu veux rester doux.'},
+  {id:'low_impact_circuit',name:'Circuit cardio sans impact',movement:'cardio',target:'Cardio, tout le corps',svg:'circuit',safeFor:['knee'],difficulty:'intermediate',goals:['fatloss','general'],how:'Squat partiel, marche active, gainage court, mobilité dynamique.',tips:'Rythme régulier, technique propre.'},
 
   {id:'shoulders',name:'Mobilité épaules',movement:'mobility',target:'Épaules',svg:'mobility',difficulty:'beginner',goals:['mobility','general'],how:'Cercles lents, rotations, ouverture thoracique.',tips:'Aucune douleur.'},
   {id:'hips',name:'Respiration + mobilité hanches',movement:'mobility',target:'Dos, hanches',svg:'mobility',safeFor:['back'],difficulty:'beginner',goals:['mobility'],how:'Respiration lente, bascule bassin, ouverture douce.',tips:'Cherche le relâchement.'},
-  {id:'wrists',name:'Mobilité poignets',movement:'mobility',target:'Poignets',svg:'mobility',difficulty:'beginner',goals:['mobility','general'],how:'Flexion/extension douce, appuis progressifs.',tips:'Utile pour supports et anneaux.'}
+  {id:'wrists',name:'Mobilité poignets',movement:'mobility',target:'Poignets',svg:'mobility',difficulty:'beginner',goals:['mobility','general'],how:'Flexion/extension douce, appuis progressifs.',tips:'Utile pour supports et anneaux.'},
+  {id:'thoracic',name:'Mobilité thoracique',movement:'mobility',target:'Dos haut, posture',svg:'mobility',safeFor:['back','shoulder'],difficulty:'beginner',goals:['mobility','general'],how:'Rotations lentes, ouverture de poitrine, respiration calme.',tips:'Aide les pompes, rows et la posture.'},
+  {id:'ankles',name:'Mobilité chevilles',movement:'mobility',target:'Chevilles, squats, marche',svg:'mobility',safeFor:['knee'],difficulty:'beginner',goals:['mobility','general'],how:'Genou avance doucement vers l’avant, talon au sol.',tips:'Utile pour les squats et les fentes.'},
+  {id:'hamstrings',name:'Mobilité ischios douce',movement:'mobility',target:'Arrière des jambes, bas du dos',svg:'mobility',safeFor:['back'],difficulty:'beginner',goals:['mobility'],how:'Étirements actifs courts, dos long, respiration lente.',tips:'Ne force pas, cherche de la fluidité.'}
 ];
 
 function adaptiveContext(){
@@ -1968,7 +2090,7 @@ function vvStorageKeys(){
 
 function exportUserData(){
   const data={
-    app:'vV Sport',
+    app:cleanAppName(appName),
     version:APP_VERSION,
     exportedAt:new Date().toISOString(),
     values:{}
@@ -2025,11 +2147,15 @@ function resetNotesData(){
 
 function resetProfileData(){
   if(!confirm('Réinitialiser le profil, le matériel et les options ? Progression, notes et stats restent conservées.'))return;
-  ['vv-level','vv-mode','vv-ready','vv-custom-profile','vv-custom-profiles','vv-active-custom-profile','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound'].forEach(k=>storageSafe.removeItem(k));
+  ['vv-level','vv-mode','vv-ready','vv-custom-profile','vv-custom-profiles','vv-active-custom-profile','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound','vv-color-theme','vv-profile-color','vv-timer-color','vv-timer-preset-color'].forEach(k=>storageSafe.removeItem(k));
   profile={level:'',mode:''};
   customProfile=loadCustomProfile();
   equipment={rings:true,push:true,db:true,treadmill:true,bike:true};
   soundEnabled=true;
+  colorThemeKey='lime';
+  applyColorTheme(colorThemeKey);
+  timerPresetColorKey='auto';
+  applyTimerColor();
   showProfileSetup();
 }
 function renderStats(){
@@ -2171,6 +2297,7 @@ function restoreAppState(){
 }
 
 function updateLaunchInfo(){
+  updateAppNameUI();
   const dayEl=document.getElementById('launch-day');
   const profileEl=document.getElementById('launch-profile');
   if(dayEl)dayEl.textContent=getRealDay();
@@ -2235,6 +2362,9 @@ function ensureAdaptiveMode(){
 }
 
 function boot(){
+  applyColorTheme();
+  applyTimerColor();
+  updateAppNameUI();
   ensureAdaptiveMode();
   loadPrepTime();
   renderChoices();
@@ -2311,6 +2441,7 @@ function hasActiveTimerSession(){
     timer.phase==='prep' ||
     (timer.guided && hasTimeLeft) ||
     (hasTimeLeft && timer.phase==='rest') ||
+    (hasTimeLeft && timer.phase==='manual' && timer.left<timer.seconds) ||
     (hasTimeLeft && timer.phase==='effort' && timer.left<timer.seconds)
   );
 }
@@ -2398,68 +2529,91 @@ function renderOptions(){
 
   const opt=document.getElementById('options-content');
   if(!opt)return;
+  const openOptionSections={};
+  opt.querySelectorAll('details[data-options-section]').forEach(section=>{
+    openOptionSections[section.dataset.optionsSection]=section.open;
+  });
+  const optionOpenAttr=(key,fallback=false)=>(openOptionSections[key]??fallback)?' open':'';
   opt.replaceChildren ? opt.replaceChildren() : opt.innerHTML='';
 
   opt.innerHTML=`
-    <div class="page-header compact">
-      <h2>Options</h2>
-      <p>Modifier le profil</p>
+    <div class="page-header compact options-hero">
+      <div>
+        <h2>Options</h2>
+        <p>Réglages du profil et de l’app</p>
+      </div>
     </div>
 
-    <div class="setup-label" style="padding-left:12px">Niveau</div>
-    <div style="padding:0 12px" class="choice-grid">${levelHTML}</div>
-    ${profile.level==='perso'&&customProfileOpen?'<div style="padding:0 12px">'+customProfileFormHTML()+'</div>':''}
+    <div class="options-stack">
+      <details class="options-section options-dropdown" data-options-section="level"${optionOpenAttr('level',true)}>
+        <summary><span>Niveau</span></summary>
+        <div class="choice-grid">${levelHTML}</div>
+        ${profile.level==='perso'&&customProfileOpen?'<div class="options-form-wrap">'+customProfileFormHTML()+'</div>':''}
+      </details>
 
-    <div class="setup-label" style="padding-left:12px">Minuteur</div>
-    <div style="padding:0 12px" class="choice-grid">
-      <button id="sound-toggle" class="choice-btn ${soundEnabled?'active':''}" type="button" aria-pressed="${soundEnabled?'true':'false'}" onclick="toggleSoundOption()">
-        <strong>Sons du minuteur</strong>
-        <span>${soundEnabled?'Activé':'Désactivé'} · bips + vibration</span>
-      </button>
+      <details class="options-section options-dropdown options-section-inline" data-options-section="timer"${optionOpenAttr('timer')}>
+        <summary><span>Minuteur son</span></summary>
+        <button id="sound-toggle" class="sound-segment ${soundEnabled?'active':''}" type="button" aria-pressed="${soundEnabled?'true':'false'}" onclick="toggleSoundOption()">
+          <span>Off</span>
+          <strong>On</strong>
+        </button>
+      </details>
+
+      <details class="options-section options-dropdown" data-options-section="theme"${optionOpenAttr('theme')}>
+        <summary><span>Thème couleur</span></summary>
+        ${colorThemeOptionsHTML()}
+      </details>
+
+      <details class="options-section options-dropdown" data-options-section="equipment"${optionOpenAttr('equipment')}>
+        <summary><span>Matériel disponible</span></summary>
+        <div class="choice-grid">${equipmentChoicesHTML()}</div>
+      </details>
+
+      <details class="options-section options-dropdown" data-options-section="data"${optionOpenAttr('data')}>
+        <summary><span>Données</span></summary>
+        <div class="choice-grid options-data-grid">
+          <button class="choice-btn" type="button" onclick="exportUserData()">
+            <strong>Exporter mes données</strong>
+            <span>Sauvegarde profil, notes, progression et stats en JSON.</span>
+          </button>
+          <button class="choice-btn" type="button" onclick="triggerImportUserData()">
+            <strong>Importer une sauvegarde</strong>
+            <span>Restaure un fichier exporté depuis vV Sport.</span>
+          </button>
+          <input id="import-data-input" class="hidden" type="file" accept="application/json,.json" onchange="importUserData(this.files&&this.files[0]);this.value=''">
+        </div>
+      </details>
+
+      <details class="options-section options-dropdown options-danger-section" data-options-section="reset"${optionOpenAttr('reset')}>
+        <summary><span>Réinitialiser</span></summary>
+        <div class="choice-grid danger-grid">
+          <button class="choice-btn danger-choice" type="button" onclick="resetProgressData()">
+            <strong>Progression cochée</strong>
+            <span>Garde les notes, stats et réglages.</span>
+          </button>
+          <button class="choice-btn danger-choice" type="button" onclick="resetNotesData()">
+            <strong>Notes personnelles</strong>
+            <span>Supprime seulement les notes des cartes.</span>
+          </button>
+          <button class="choice-btn danger-choice" type="button" onclick="resetStats()">
+            <strong>Stats et historique</strong>
+            <span>Remet à zéro les séances, exercices et streak.</span>
+          </button>
+          <button class="choice-btn danger-choice" type="button" onclick="resetProfileData()">
+            <strong>Profil et matériel</strong>
+            <span>Relance la configuration initiale.</span>
+          </button>
+        </div>
+      </details>
     </div>
 
-    <div class="setup-label" style="padding-left:12px">Matériel disponible</div>
-    <div style="padding:0 12px" class="choice-grid">${equipmentChoicesHTML()}</div>
+    <div class="app-version">${escapeHTML(cleanAppName(appName))} ${APP_VERSION}</div>
 
-    <div class="setup-label" style="padding-left:12px">Données</div>
-    <div style="padding:0 12px" class="choice-grid">
-      <button class="choice-btn" type="button" onclick="exportUserData()">
-        <strong>Exporter mes données</strong>
-        <span>Sauvegarde profil, notes, progression et stats en JSON.</span>
-      </button>
-      <button class="choice-btn" type="button" onclick="triggerImportUserData()">
-        <strong>Importer une sauvegarde</strong>
-        <span>Restaure un fichier exporté depuis vV Sport.</span>
-      </button>
-      <input id="import-data-input" class="hidden" type="file" accept="application/json,.json" onchange="importUserData(this.files&&this.files[0]);this.value=''">
-    </div>
-
-    <div class="setup-label" style="padding-left:12px">Réinitialiser</div>
-    <div style="padding:0 12px" class="choice-grid danger-grid">
-      <button class="choice-btn danger-choice" type="button" onclick="resetProgressData()">
-        <strong>Progression cochée</strong>
-        <span>Garde les notes, stats et réglages.</span>
-      </button>
-      <button class="choice-btn danger-choice" type="button" onclick="resetNotesData()">
-        <strong>Notes personnelles</strong>
-        <span>Supprime seulement les notes des cartes.</span>
-      </button>
-      <button class="choice-btn danger-choice" type="button" onclick="resetStats()">
-        <strong>Stats et historique</strong>
-        <span>Remet à zéro les séances, exercices et streak.</span>
-      </button>
-      <button class="choice-btn danger-choice" type="button" onclick="resetProfileData()">
-        <strong>Profil et matériel</strong>
-        <span>Relance la configuration initiale.</span>
-      </button>
-    </div>
-
-    <div class="app-version">vV Sport ${APP_VERSION}</div>
-
-    <div style="padding:20px 12px 90px">
+    <div class="options-apply">
       <button class="primary-btn" onclick="saveProfileAndEnter()">Appliquer</button>
     </div>
   `;
+  if(currentTab==='options')renderHeaderNavControls();
 }
 
 function profilePillLabel(){
@@ -2468,13 +2622,21 @@ function profilePillLabel(){
   return levelLabel;
 }
 
-function renderAllImpl(){updateSessionRunner();if(typeof renderEquipment==='function')renderEquipment();if(typeof renderStats==='function')renderStats();renderTimerDaySelect();renderChoices();renderDays();renderInfo();renderExercises();renderExerciseLibrary();renderWeek();document.getElementById('profile-pill').textContent=profilePillLabel();document.getElementById('tip-mode').textContent=timerModeLabel ? timerModeLabel() : profilePillLabel()}
+function profilePillHTML(){
+  if(profile.level==='perso'){
+    const name=profileDisplayName(customProfile);
+    return '<span class="profile-avatar" aria-hidden="true"></span><span class="profile-copy"><strong>'+escapeHTML(name)+'</strong><em>'+escapeHTML(customGoalLabel())+' · '+escapeHTML((customProfile&&customProfile.sessionTime)||'45')+' min</em></span>';
+  }
+  const label=(LEVELS&&LEVELS[profile.level]) ? LEVELS[profile.level].label : 'À configurer';
+  const sub=(LEVELS&&LEVELS[profile.level]) ? (LEVELS[profile.level].sub||'Programme standard') : 'Choisis ton profil';
+  return '<span class="profile-avatar" aria-hidden="true"></span><span class="profile-copy"><strong>'+escapeHTML(label)+'</strong><em>'+escapeHTML(sub)+'</em></span>';
+}
+
+function renderAllImpl(){applyTimerColor();updateSessionRunner();if(typeof renderEquipment==='function')renderEquipment();if(typeof renderStats==='function')renderStats();renderTimerDaySelect();renderChoices();renderDays();renderInfo();renderExercises();renderExerciseLibrary();renderWeek();const pill=document.getElementById('profile-pill');if(pill)pill.innerHTML=profilePillHTML();document.getElementById('tip-mode').textContent=timerModeLabel ? timerModeLabel() : profilePillLabel()}
 
 // Wrapper with memoization to prevent duplicate renders
 function renderAll() {
-  if (shouldRender()) {
-    renderAllImpl();
-  }
+  renderAllImpl();
 }
 function renderDays(){document.getElementById('day-scroller').innerHTML=DAYS.map(d=>`<button class="day-chip ${d===currentDay?'active':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);renderAll()">${d}</button>`).join('')}
 
@@ -2889,10 +3051,68 @@ function getExerciseLibraryItems(){
       const key=(ex.name||'')+'|'+(ex.target||'')+'|'+(ex.sets||'');
       if(seen.has(key))return;
       seen.add(key);
-      items.push({day,index,ex});
+      items.push({day,index,ex,theme:inferExerciseTheme(ex),source:'programme'});
     });
   });
+  const ctx=adaptiveContext();
+  ADAPTIVE_LIBRARY.forEach(item=>{
+    if(!equipmentOk(item) || !limitationOk(item,ctx))return;
+    const ex=makeAdaptiveExercise(item,ctx);
+    const key=(ex.name||'')+'|'+(ex.target||'');
+    if(seen.has(key))return;
+    seen.add(key);
+    items.push({day:null,index:null,ex,theme:item.movement,source:'bibliotheque',libraryOnly:true});
+  });
   return items;
+}
+
+const EXERCISE_THEME_LABELS={
+  push:'Push',
+  pull:'Pull',
+  legs:'Jambes',
+  core:'Gainage / abdos',
+  cardio:'Cardio',
+  mobility:'Mobilité'
+};
+const EXERCISE_THEME_ORDER=['push','pull','legs','core','cardio','mobility'];
+
+function inferExerciseTheme(ex){
+  const text=((ex&&ex.name)||'')+' '+((ex&&ex.target)||'')+' '+((ex&&ex.type)||'')+' '+((ex&&ex.svg)||'');
+  const n=text.toLowerCase();
+  if(/cardio|vélo|velo|tapis|marche|mountain|souffle|zone 2/.test(n))return 'cardio';
+  if(/mobilité|mobilite|étirement|etirement|poignet|hanche|cheville|thoracique|respiration|récup/.test(n))return 'mobility';
+  if(/jambe|squat|fente|mollet|chaise|fessier|split|bulgarian/.test(n))return 'legs';
+  if(/dos|rowing|traction|curl|biceps|pull|oiseau|face pull/.test(n))return 'pull';
+  if(/abdo|gainage|planche|core|hollow|dead bug|crunch|relevé|releve/.test(n))return 'core';
+  return 'push';
+}
+
+function exerciseCardHTML(item,libraryIndex){
+  const ex=item.ex;
+  const visualKey=chooseExerciseVisual(ex);
+  const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
+  const timing=ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort||60)+' · Récupération '+fmt(ex.rest||0);
+  const sourceLabel=item.source==='programme' ? item.day+' · programme' : 'Bibliothèque · exercice seul';
+  return `<div class="ex-card library-ex-card" onclick="toggleCard(this)">
+    <div class="ex-header">
+      <div class="ex-title-block">
+        <div class="ex-name">${ex.name}</div>
+        <div class="ex-sets">${ex.sets||sourceLabel}</div>
+        <div class="exercise-source">${sourceLabel}</div>
+      </div>
+      <div class="ex-actions">
+        <button type="button" class="mini-timer-btn" title="Lancer l’exercice" aria-label="Lancer l’exercice" onclick="event.preventDefault();event.stopPropagation();startLibraryExercise(${libraryIndex})">▶</button>
+        <svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M5 7l5 5 5-5"/></svg>
+      </div>
+    </div>
+    <div class="ex-body">
+      <div class="ex-visual" data-visual="${visualKey}">${visual}</div>
+      <div class="ex-meta"><strong>Cible :</strong> ${ex.target||'—'}<br><strong>Comment faire :</strong> ${ex.how||'Fais le mouvement avec contrôle.'}<br><strong>Conseil :</strong> ${ex.tips||'Garde une technique propre.'}</div>
+      ${tutorialLinkHTML(ex)}
+      <div class="ex-timer-line">${timing}</div>
+      ${circuitHTML(ex)}
+    </div>
+  </div>`;
 }
 
 function renderExerciseProfileQuick(){
@@ -2931,36 +3151,35 @@ function renderExerciseLibrary(){
     return;
   }
 
-  list.innerHTML=items.map((item,libraryIndex)=>{
-    const ex=item.ex;
-    const visualKey=chooseExerciseVisual(ex);
-    const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
-    const timing=ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort||60)+' · Récupération '+fmt(ex.rest||0);
-    return `<div class="ex-card library-ex-card" onclick="toggleCard(this)">
-      <div class="ex-header">
-        <div class="ex-title-block">
-          <div class="ex-name">${ex.name}</div>
-          <div class="ex-sets">${ex.sets||item.day+' · exercice seul'}</div>
-        </div>
-        <div class="ex-actions">
-          <button type="button" class="mini-timer-btn" title="Lancer l’exercice" aria-label="Lancer l’exercice" onclick="event.preventDefault();event.stopPropagation();startLibraryExercise(${libraryIndex})">▶</button>
-          <svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M5 7l5 5 5-5"/></svg>
-        </div>
-      </div>
-      <div class="ex-body">
-        <div class="ex-visual" data-visual="${visualKey}">${visual}</div>
-        <div class="ex-meta"><strong>Cible :</strong> ${ex.target||'—'}<br><strong>Comment faire :</strong> ${ex.how||'Fais le mouvement avec contrôle.'}<br><strong>Conseil :</strong> ${ex.tips||'Garde une technique propre.'}</div>
-        ${tutorialLinkHTML(ex)}
-        <div class="ex-timer-line">${timing}</div>
-        ${circuitHTML(ex)}
-      </div>
-    </div>`;
+  list.innerHTML=EXERCISE_THEME_ORDER.map(theme=>{
+    const group=items.map((item,index)=>({...item,libraryIndex:index})).filter(item=>item.theme===theme);
+    if(!group.length)return '';
+    return `<details class="exercise-theme-section" ${theme==='push'?'open':''}>
+      <summary class="exercise-theme-head">
+        <span>${EXERCISE_THEME_LABELS[theme]}</span>
+        <strong>${group.length}</strong>
+      </summary>
+      ${group.map(item=>exerciseCardHTML(item,item.libraryIndex)).join('')}
+    </details>`;
   }).join('');
 }
 
 function startLibraryExercise(libraryIndex){
   const item=getExerciseLibraryItems()[Number(libraryIndex)];
   if(!item)return;
+  if(item.libraryOnly){
+    const ex=item.ex;
+    setTimerState(ex.effort||60,ex.name,'EXERCICE',ex.name,ex.rest||0,ex);
+    timer.freeMode=true;
+    timer.sourceDay=null;
+    timer.sourceIndex=null;
+    startPrepCountdown();
+    updateTimerDetails();
+    updateTimer();
+    showTab('timer');
+    saveAppState();
+    return;
+  }
   startExerciseTimer(item.day,item.index,{free:true});
 }
 
@@ -3009,7 +3228,7 @@ function resetWeek(){
   renderAll();
   saveAppState();
 }
-function renderWeek(){const grid=document.getElementById('week-grid');if(!grid)return;grid.innerHTML=DAYS.map(d=>{const p=pct(d);return `<div class="week-card ${d===currentDay?'today':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);showProgramView('today');renderAll()"><div class="wday">${d}</div><div class="wtitle">${P()[d].title}</div><div class="wpct ${p===100?'full':''}">${p}%</div><div class="week-prog-track"><div class="week-prog-fill" style="width:${p}%"></div></div><span class="badge ${p===100?'badge-done':p>0?'badge-partial':'badge-rest'}">${p===100?'fait':p>0?'en cours':'à faire'}</span></div>`}).join('')}
+function renderWeek(){const grid=document.getElementById('week-grid');if(!grid)return;grid.innerHTML=DAYS.map(d=>{const p=pct(d);return `<div class="week-card ${d===currentDay?'today':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);showProgramView('today',{keepDay:true});renderAll()"><div class="wday">${d}</div><div class="wtitle">${P()[d].title}</div><div class="wpct ${p===100?'full':''}">${p}%</div><div class="week-prog-track"><div class="week-prog-fill" style="width:${p}%"></div></div><span class="badge ${p===100?'badge-done':p>0?'badge-partial':'badge-rest'}">${p===100?'fait':p>0?'en cours':'à faire'}</span></div>`}).join('')}
 
 function bindNavigationTabs(){
   document.querySelectorAll('[data-tab]').forEach(btn=>{
@@ -3028,6 +3247,41 @@ function getTabPageNames(){
   return ['program','exercises','timer','stats','options'];
 }
 
+const TAB_LABELS={
+  program:'Programme',
+  exercises:'Exercices',
+  timer:'Minuteur',
+  stats:'Stats',
+  options:'Options'
+};
+
+function navigateTab(delta){
+  const names=getTabPageNames();
+  const index=Math.max(0,names.indexOf(currentTab));
+  const next=names[(index+delta+names.length)%names.length];
+  showTab(next);
+}
+
+function renderHeaderNavControls(){
+  document.querySelectorAll('.page-nav-controls').forEach(el=>el.remove());
+  const names=getTabPageNames();
+  if(!currentTab || !names.includes(currentTab))return;
+  const page=document.getElementById('tab-'+currentTab);
+  if(!page || page.hidden || page.style.display==='none')return;
+  const header=page.querySelector('.page-header');
+  if(!header)return;
+
+  const index=names.indexOf(currentTab);
+  const prev=names[(index-1+names.length)%names.length];
+  const next=names[(index+1)%names.length];
+  const controls=document.createElement('div');
+  controls.className='page-nav-controls';
+  controls.innerHTML=
+    '<button class="page-nav-btn" type="button" onclick="navigateTab(-1)" aria-label="Page précédente : '+escapeHTML(TAB_LABELS[prev]||prev)+'">‹</button>'+
+    '<button class="page-nav-btn" type="button" onclick="navigateTab(1)" aria-label="Page suivante : '+escapeHTML(TAB_LABELS[next]||next)+'">›</button>';
+  header.appendChild(controls);
+}
+
 function normalizeTabTarget(t){
   if(t==='today'||t==='week'){
     programView=t;
@@ -3037,9 +3291,14 @@ function normalizeTabTarget(t){
   return t;
 }
 
-function showProgramView(view){
+function showProgramView(view,opts={}){
   programView=view==='week'?'week':'today';
   storageSafe.setItem('vv-program-view',programView);
+  if(programView==='today'&&!opts.keepDay){
+    currentDay=getRealDay();
+    storageSafe.setItem('vv-current-day',currentDay);
+    renderAll();
+  }
 
   ['today','week'].forEach(name=>{
     const panel=document.getElementById('program-'+name);
@@ -3077,7 +3336,6 @@ function ensureStatsTab(){
         <div class="page-title">Stats</div>
         <div class="page-sub">Progression, régularité et historique</div>
       </div>
-      <button class="stats-reset-btn" type="button" onclick="resetStats()">Reset stats</button>
     </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Séances</div><div class="stat-value" id="stat-sessions">0</div></div>
@@ -3088,7 +3346,8 @@ function ensureStatsTab(){
     <div class="coach-card"><div class="coach-title">Coach</div><div class="coach-text" id="coach-text">Lance ou valide quelques exercices pour créer tes premières stats.</div></div>
     <div class="coach-card"><div class="coach-title">7 derniers jours</div><div class="chart" id="stats-chart"></div></div>
     <div class="coach-card"><div class="coach-title">Semaine actuelle</div><div id="stats-week"></div></div>
-    <div class="section-label">Historique par jour</div><div class="history-list" id="history-list"></div>`;
+    <div class="section-label">Historique par jour</div><div class="history-list" id="history-list"></div>
+    <div class="stats-reset-footer"><button class="stats-reset-btn" type="button" onclick="resetStats()">Reset stats</button></div>`;
   if(options)appScreen.insertBefore(el,options); else appScreen.insertBefore(el,appScreen.querySelector('.tab-bar'));
 }
 
@@ -3118,6 +3377,8 @@ function showTab(t){
 
   if(currentTab==='timer'){
     renderTimerDaySelect();
+    renderTimerTune();
+    renderTimerColorPreset();
     updateTimer();
     updateTimerDetails();
   }
@@ -3126,6 +3387,7 @@ function showTab(t){
   if(currentTab==='program')showProgramView(programView);
 
   if(typeof bindNavigationTabs==='function')bindNavigationTabs();
+  renderHeaderNavControls();
   storageSafe.setItem('vv-current-tab',currentTab);
   saveAppState();
 }
@@ -3136,8 +3398,6 @@ function renderSoundOption(){
   if(!btn)return;
   btn.classList.toggle('active',soundEnabled);
   btn.setAttribute('aria-pressed',soundEnabled?'true':'false');
-  const label=btn.querySelector('span');
-  if(label)label.textContent=soundEnabled?'Activé · bips + vibration':'Désactivé · bips + vibration';
 }
 function toggleSoundOption(){
   soundEnabled=!soundEnabled;
@@ -3212,6 +3472,45 @@ function playBeep(freq=660,duration=0.10,type='sine',volume=0.28){
   }catch(e){}
 }
 
+function playTone(freq=660,duration=0.14,delay=0,volume=0.18,type='sine'){
+  if(!soundEnabled)return;
+  const ctx=getAudioCtx();
+  if(!ctx)return;
+
+  try{
+    if(ctx.state==='suspended')ctx.resume();
+
+    const now=ctx.currentTime+delay;
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    const filter=ctx.createBiquadFilter();
+
+    osc.type=type;
+    osc.frequency.setValueAtTime(freq,now);
+    filter.type='lowpass';
+    filter.frequency.setValueAtTime(2600,now);
+    filter.Q.setValueAtTime(0.2,now);
+
+    gain.gain.setValueAtTime(0.0001,now);
+    gain.gain.linearRampToValueAtTime(volume,now+0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now+duration+0.04);
+  }catch(e){}
+}
+
+function playChime(notes,baseVolume=0.16){
+  if(!soundEnabled)return;
+  notes.forEach((note,index)=>{
+    playTone(note.freq,note.duration||0.16,note.delay??(index*0.11),note.volume||baseVolume,note.type||'sine');
+  });
+}
+
 function vibrate(pattern){
   if(soundEnabled&&'vibrate' in navigator)navigator.vibrate(pattern);
 }
@@ -3239,10 +3538,11 @@ async function testSound(){
   await unlockAudio();
   await unlockSoundFiles();
 
-  playSoundFile('done');
-  playBeep(523,0.12,'sine',0.45);
-  setTimeout(()=>playBeep(659,0.12,'sine',0.45),160);
-  setTimeout(()=>playBeep(784,0.14,'sine',0.45),320);
+  playChime([
+    {freq:523,duration:0.16,delay:0,volume:0.16},
+    {freq:659,duration:0.16,delay:0.12,volume:0.15},
+    {freq:784,duration:0.22,delay:0.24,volume:0.14}
+  ]);
   vibrate([80,60,120]);
 
   const phase=document.getElementById('timer-phase');
@@ -3265,26 +3565,94 @@ function playSoundFile(type){
 }
 
 function cue(type){
-  if(type==='start'){playSoundFile('start');playBeep(740,0.12,'sine',0.45);vibrate([90]);}
-  if(type==='count'){playSoundFile('count');playBeep(960,0.07,'square',0.35);vibrate(35);}
-  if(type==='rest'){playSoundFile('rest');playBeep(520,0.16,'sine',0.45);setTimeout(()=>playBeep(520,0.16,'sine',0.45),190);vibrate([100,70,100]);}
-  if(type==='done'){playSoundFile('done');playBeep(660,0.12,'sine',0.45);setTimeout(()=>playBeep(880,0.16,'sine',0.45),160);vibrate([130,80,170]);}
+  if(type==='start'){
+    playChime([
+      {freq:587,duration:0.13,delay:0,volume:0.14},
+      {freq:784,duration:0.18,delay:0.11,volume:0.16}
+    ]);
+    vibrate([70]);
+  }
+  if(type==='count'){
+    playTone(880,0.075,0,0.105,'sine');
+    vibrate(28);
+  }
+  if(type==='rest'){
+    playChime([
+      {freq:494,duration:0.14,delay:0,volume:0.13},
+      {freq:392,duration:0.22,delay:0.14,volume:0.12}
+    ]);
+    vibrate([85,55,85]);
+  }
+  if(type==='done'){
+    playChime([
+      {freq:523,duration:0.14,delay:0,volume:0.14},
+      {freq:659,duration:0.14,delay:0.11,volume:0.145},
+      {freq:784,duration:0.24,delay:0.22,volume:0.135}
+    ]);
+    vibrate([110,70,150]);
+  }
 }
 
 
 function setPrepTime(seconds){
   timer.prep=Math.max(0,Number(seconds)||0);
   storageSafe.setItem('vv-prep-time',String(timer.prep));
+  timerTune.prep=timer.prep;
+  storageSafe.setItem('vv-timer-tune-prep',String(timerTune.prep));
+  renderTimerTune();
 }
 function loadPrepTime(){
   const saved=storageSafe.getItem('vv-prep-time');
   timer.prep=saved===null?5:Math.max(0,Number(saved)||0);
+  timerTune.prep=timer.prep;
   const select=document.getElementById('prep-select');
   if(select)select.value=String(timer.prep);
+  renderTimerTune();
 }
 
 function setTimerState(seconds,ctx,phase='PRÊT',exercise=null,rest=0,exerciseData=null){clearInterval(timer.interval);timer={seconds,left:seconds,interval:null,running:false,phase:'effort',exercise,exerciseData,effort:seconds,rest,totalPhase:seconds,prep:timer.prep??5,pendingStart:false,circuit:exerciseData&&exerciseData.circuit?exerciseData.circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};document.getElementById('timer-context').textContent=ctx;document.getElementById('timer-phase').textContent=phase;document.getElementById('tip-effort').textContent=fmt(seconds);document.getElementById('tip-rest').textContent=rest?fmt(rest):'—';syncTimerLabels();updateTimer();saveAppState()}
-function setManualTimer(s){setTimerState(s,'Timer manuel','PRÊT',null,0,null);timer.exerciseData=null;updateTimerDetails()}
+function renderTimerTune(){
+  const effort=document.getElementById('timer-tune-effort');
+  const rest=document.getElementById('timer-tune-rest');
+  const prep=document.getElementById('timer-tune-prep');
+  if(effort)effort.textContent=fmt(timerTune.effort);
+  if(rest)rest.textContent=fmt(timerTune.rest);
+  if(prep)prep.textContent=fmt(timerTune.prep);
+}
+function stepTimerTune(kind,delta){
+  if(!timerTune || !(kind in timerTune))return;
+  const min=kind==='effort'?15:0;
+  const max=kind==='effort'?900:(kind==='rest'?300:60);
+  timerTune[kind]=Math.max(min,Math.min(max,(Number(timerTune[kind])||0)+delta));
+  storageSafe.setItem('vv-timer-tune-'+kind,String(timerTune[kind]));
+  if(kind==='prep'){
+    timer.prep=timerTune.prep;
+    storageSafe.setItem('vv-prep-time',String(timer.prep));
+    const select=document.getElementById('prep-select');
+    if(select)select.value=String(timer.prep);
+  }
+  renderTimerTune();
+}
+function applyTunedManualTimer(){
+  timer.prep=timerTune.prep;
+  storageSafe.setItem('vv-prep-time',String(timer.prep));
+  setTimerState(timerTune.effort,'Timer manuel','PRÊT',null,timerTune.rest,null);
+  timer.phase='manual';
+  timer.exerciseData=null;
+  timer.freeMode=true;
+  updateTimerDetails();
+  renderTimerTune();
+}
+function setManualTimer(s){
+  timerTune.effort=Math.max(15,Number(s)||90);
+  storageSafe.setItem('vv-timer-tune-effort',String(timerTune.effort));
+  renderTimerTune();
+  setTimerState(s,'Timer manuel','PRÊT',null,timerTune.rest||0,null);
+  timer.phase='manual';
+  timer.exerciseData=null;
+  timer.freeMode=true;
+  updateTimerDetails();
+}
 function startExerciseTimer(day,i,options={}){
   const ex=P()[day].exercises[i];
   if(ex.type==='repos')return;
@@ -3348,7 +3716,7 @@ function timerContextLabel(){
 
   if(status==='Avant départ')return 'Prépare-toi · '+name;
   if(status==='Récupération')return 'Récupération · '+name;
-  if(status==='En pause')return 'En pause · '+name;
+  if(status==='En pause')return name;
   if(status==='Terminé')return 'Terminé · '+name;
   if(status==='Exercice en cours')return 'Exercice · '+name;
   return name;
@@ -3475,7 +3843,7 @@ function syncTimerButtons(){
 
 
 function timerPhaseLabel(){
-  if(!timer.running && hasActiveTimerSession()) return 'Pause';
+  if(!timer.running && hasActiveTimerSession()) return timer.phase==='rest'?'Récupération':'Effort';
   if(timer.phase==='prep' || timer.pendingStart) return 'Décompte';
   if(timer.phase==='effort') return 'Effort';
   if(timer.phase==='rest') return 'Récupération';
@@ -3483,7 +3851,7 @@ function timerPhaseLabel(){
   return 'Bloc en cours';
 }
 function timerMeaningText(){
-  if(!timer.running && hasActiveTimerSession()) return 'Pause active : reprends quand tu es prêt, ou recommence ce bloc si tu veux repartir proprement.';
+  if(!timer.running && hasActiveTimerSession()) return 'Reprends quand tu es prêt, ou recommence ce bloc si tu veux repartir proprement.';
   if(timer.phase==='prep' || timer.pendingStart) return 'Prépare-toi : l’exercice démarre à la fin du décompte.';
   if(timer.phase==='effort') return 'Ce temps correspond à l’effort de l’exercice en cours.';
   if(timer.phase==='rest') return 'Ce temps correspond à la récupération avant la suite.';
@@ -3525,7 +3893,7 @@ function updateTimerValidateButton(){
 
 
 function canRestartTimer(){
-  return !!(timer && (timer.exercise || timer.exerciseData || timer.circuit || timer.sourceDay!==null));
+  return !!(timer && (timer.exercise || timer.exerciseData || timer.circuit || timer.sourceDay!==null || timer.phase==='manual' || timer.freeMode));
 }
 
 function restartCurrentTimer(){
@@ -3535,6 +3903,7 @@ function restartCurrentTimer(){
   const sourceIndex=timer.sourceIndex;
   const data=timer.exerciseData ? {...timer.exerciseData} : null;
   const circuit=timer.circuit ? timer.circuit.map(step=>({...step})) : null;
+  const wasManual=(timer.phase==='manual' || (timer.freeMode && sourceDay===null && sourceIndex===null && !data && !circuit));
   const exerciseName=timer.exercise || (data&&data.name) || 'Exercice';
   const rest=timer.rest || (data&&data.rest) || 0;
   const effort=timer.effort || timer.seconds || (data&&data.effort) || 30;
@@ -3566,7 +3935,11 @@ function restartCurrentTimer(){
     return;
   }
 
-  setTimerState(effort,timer.context || exerciseName,'EXERCICE',exerciseName,rest,data);
+  setTimerState(effort,wasManual?'Timer manuel':(timer.context || exerciseName),wasManual?'PRÊT':'EXERCICE',wasManual?null:exerciseName,rest,data);
+  if(wasManual){
+    timer.phase='manual';
+    timer.freeMode=true;
+  }
   timer.sourceDay=sourceDay;
   timer.sourceIndex=sourceIndex;
   startPrepCountdown();
@@ -3645,6 +4018,7 @@ function startPrepCountdown(){
   clearInterval(timer.interval);
   timer.pendingStart=true;
   timer.running=true;
+  updateMainTimerButton();
   const originalLeft=timer.left;
   let prepLeft=timer.prep;
   document.getElementById('timer-phase').textContent='PRÉPARATION';
@@ -3742,7 +4116,8 @@ function startActiveTimer(){
 function toggleTimer(){
   if(timer.running){
     timer.running=false;
-    timer.pendingStart=false;syncTimerLabels();
+    if(!timer.pendingStart)timer.pendingStart=false;
+    syncTimerLabels();
     clearInterval(timer.interval);
     updateTimer();
     saveAppState();
@@ -3754,7 +4129,12 @@ function toggleTimer(){
     timer.totalPhase=timer.seconds;
   }
 
-  const shouldPrep = timer.phase==='effort' && timer.prep>0 && !timer.pendingStart;
+  if(timer.pendingStart && timer.prep>0){
+    startPrepCountdown();
+    return;
+  }
+
+  const shouldPrep = (timer.phase==='effort' || timer.phase==='manual') && timer.prep>0 && !timer.pendingStart;
   if(shouldPrep){
     startPrepCountdown();
     return;
@@ -4157,6 +4537,119 @@ function __testGuidedSessionValidation(){
   return marked && progressMoved && steps.every(step=>step.sourceKey&&Number.isInteger(step.exerciseIndex));
 }
 
+function __testWeekProgressAfterCheck(){
+  const beforeDay=currentDay;
+  let dayName=null;
+  let index=-1;
+
+  DAYS.some(day=>{
+    const p=P()[day];
+    if(!p||!p.exercises)return false;
+    const i=p.exercises.findIndex(ex=>ex.type!=='repos');
+    if(i>=0){
+      dayName=day;
+      index=i;
+      return true;
+    }
+    return false;
+  });
+
+  if(!dayName || index<0)return true;
+
+  const exercises=P()[dayName].exercises;
+  const originals=exercises.map(ex=>[
+    'done-'+key(ex,dayName),
+    storageSafe.getItem('done-'+key(ex,dayName)),
+    'done-'+legacyKey(ex,dayName),
+    storageSafe.getItem('done-'+legacyKey(ex,dayName))
+  ]);
+
+  exercises.forEach(ex=>setDone(ex,false,{silent:true},dayName));
+  renderWeek();
+  const beforePct=pct(dayName);
+
+  const fakeEvent={
+    preventDefault(){},
+    stopPropagation(){},
+    stopImmediatePropagation(){}
+  };
+  handleCheckClick(fakeEvent,dayName,index);
+  renderWeek();
+
+  const afterPct=pct(dayName);
+  const grid=document.getElementById('week-grid');
+  const html=grid ? grid.innerHTML : '';
+  const weekShowsProgress=afterPct>0 && html.includes(afterPct+'%');
+
+  originals.forEach(([stable,stableVal,legacy,legacyVal])=>{
+    if(stableVal===null)storageSafe.removeItem(stable); else storageSafe.setItem(stable,stableVal);
+    if(legacyVal===null)storageSafe.removeItem(legacy); else storageSafe.setItem(legacy,legacyVal);
+  });
+  currentDay=beforeDay;
+  renderWeek();
+
+  return beforePct===0 && afterPct>0 && weekShowsProgress;
+}
+
+function __testCheckmarkRerendersCard(){
+  const beforeDay=currentDay;
+  let dayName=null;
+  let index=-1;
+
+  DAYS.some(day=>{
+    const p=P()[day];
+    if(!p||!p.exercises)return false;
+    const i=p.exercises.findIndex(ex=>ex.type!=='repos');
+    if(i>=0){
+      dayName=day;
+      index=i;
+      return true;
+    }
+    return false;
+  });
+
+  if(!dayName || index<0)return true;
+
+  currentDay=dayName;
+  const exercises=P()[dayName].exercises;
+  const originals=exercises.map(ex=>[
+    'done-'+key(ex,dayName),
+    storageSafe.getItem('done-'+key(ex,dayName)),
+    'done-'+legacyKey(ex,dayName),
+    storageSafe.getItem('done-'+legacyKey(ex,dayName))
+  ]);
+  exercises.forEach(ex=>setDone(ex,false,{silent:true},dayName));
+  renderAll();
+
+  const fakeEvent={
+    preventDefault(){},
+    stopPropagation(){},
+    stopImmediatePropagation(){}
+  };
+  handleCheckClick(fakeEvent,dayName,index);
+
+  const firstCard=document.querySelector('#exercise-list .ex-card');
+  const firstCheck=document.querySelector('#exercise-list .check-btn');
+  const progressText=document.querySelector('#day-info-card .prog-pct');
+  const ok=!!(
+    firstCard &&
+    firstCheck &&
+    firstCard.classList.contains('done') &&
+    firstCheck.classList.contains('done') &&
+    progressText &&
+    progressText.textContent !== '0%'
+  );
+
+  originals.forEach(([stable,stableVal,legacy,legacyVal])=>{
+    if(stableVal===null)storageSafe.removeItem(stable); else storageSafe.setItem(stable,stableVal);
+    if(legacyVal===null)storageSafe.removeItem(legacy); else storageSafe.setItem(legacy,legacyVal);
+  });
+  currentDay=beforeDay;
+  renderAll();
+
+  return ok;
+}
+
 function __testStorageSafe(){
   storageSafe.setItem('vv-storage-test','ok');
   const ok=storageSafe.getItem('vv-storage-test')==='ok';
@@ -4311,6 +4804,8 @@ function __testFullAuditState(){
     (typeof __testCheckmarkCards==='function' ? __testCheckmarkCards() : true) &&
     (typeof __testStableDoneKeys==='function' ? __testStableDoneKeys() : true) &&
     (typeof __testGuidedSessionValidation==='function' ? __testGuidedSessionValidation() : true) &&
+    (typeof __testWeekProgressAfterCheck==='function' ? __testWeekProgressAfterCheck() : true) &&
+    (typeof __testCheckmarkRerendersCard==='function' ? __testCheckmarkRerendersCard() : true) &&
     (typeof __testFirstStartTimerState==='function' ? __testFirstStartTimerState() : true) &&
     (typeof __testTimerStateLabels==='function' ? __testTimerStateLabels().ok : true) &&
     (typeof __testTimerPauseResumeRestart==='function' ? __testTimerPauseResumeRestart() : true) &&
@@ -4472,11 +4967,11 @@ function __testOptionsNoDuplicate(){
   const tab=document.getElementById('tab-options');
   if(!opt||!tab)return false;
   const html=opt.innerHTML;
-  const countOptions=(html.match(/<h2>Options<\/h2>/g)||[]).length;
+  const countOptions=(html.match(/Options/g)||[]).length;
   const countNiveau=(html.match(/>Niveau</g)||[]).length;
   const countMaterial=(html.match(/>Matériel disponible</g)||[]).length;
   const tabChildrenOk=Array.from ? Array.from(tab.children).filter(x=>x.id!=='options-content').length===0 : true;
   showTab('today');
   const hiddenOk=tab.hidden===true && tab.style.display==='none';
-  return countOptions===1 && countNiveau===1 && countMaterial===1 && html.includes('Sons du minuteur') && tabChildrenOk && hiddenOk;
+  return countOptions>=1 && countNiveau===1 && countMaterial===1 && html.includes('Sons du minuteur') && html.includes('theme-grid') && tabChildrenOk && hiddenOk;
 }
