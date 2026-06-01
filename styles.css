@@ -988,6 +988,9 @@ body { -webkit-tap-highlight-color: transparent; }
   color:var(--ink);
   line-height:1.35;
 }
+.day-session-action{
+  margin-top:12px;
+}
 .session-runner-card{
   margin:0 12px 10px;
   background:var(--surface);
@@ -1610,6 +1613,14 @@ button{
 }
 .timer-validate-btn.hidden{
   display:none!important;
+}
+.timer-validate-btn.done,
+.timer-validate-btn:disabled{
+  border-color:rgba(200,240,96,.36);
+  background:rgba(200,240,96,.16);
+  color:var(--accent);
+  cursor:default;
+  opacity:1;
 }
 
 

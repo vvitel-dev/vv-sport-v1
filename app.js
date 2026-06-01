@@ -1626,7 +1626,15 @@ function equipmentChoicesHTML(){
 
 function selectLevel(k){
   if(!LEVELS || !LEVELS[k])return;
+  const wasPerso=profile.level==='perso';
   profile.level=k;
+  if(k==='perso'){
+    customProfileOpen=wasPerso?!customProfileOpen:true;
+    storageSafe.setItem('vv-custom-profile-open',customProfileOpen?'1':'0');
+  }else{
+    customProfileOpen=false;
+    storageSafe.setItem('vv-custom-profile-open','0');
+  }
   storageSafe.setItem('vv-level',k);
   renderChoices();
   if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
@@ -1743,7 +1751,7 @@ function renderChoices(){
 
   if(levelBox)levelBox.innerHTML=levelHTML;
   if(modeBox)modeBox.innerHTML=`
-    ${profile.level==='perso'?customProfileFormHTML():''}
+    ${profile.level==='perso'&&customProfileOpen?customProfileFormHTML():''}
     <div class="setup-label full-label">Matériel disponible</div>
     ${equipmentChoicesHTML()}
   `;
@@ -2388,7 +2396,7 @@ function renderOptions(){
 
     <div class="setup-label" style="padding-left:12px">Niveau</div>
     <div style="padding:0 12px" class="choice-grid">${levelHTML}</div>
-    ${profile.level==='perso'?'<div style="padding:0 12px">'+customProfileFormHTML()+'</div>':''}
+    ${profile.level==='perso'&&customProfileOpen?'<div style="padding:0 12px">'+customProfileFormHTML()+'</div>':''}
 
     <div class="setup-label" style="padding-left:12px">Minuteur</div>
     <div style="padding:0 12px" class="choice-grid">
@@ -2801,8 +2809,7 @@ function renderInfo(){
     return;
   }
   document.getElementById('day-info-card').innerHTML=
-    programHeroHTML()+
-    `<div class="card day-detail-card"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" onclick="resetDay()">Reset</button></div><div class="prog-row"><span class="prog-label">Progression</span><span class="prog-pct">${progress}%</span></div><div class="prog-track"><div class="prog-fill" style="width:${progress}%"></div></div>${sessionStatusHTML()}${sessionPlanHTML()}</div>`;
+    `<div class="card day-detail-card"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" onclick="resetDay()">Reset</button></div><div class="prog-row"><span class="prog-label">Progression</span><span class="prog-pct">${progress}%</span></div><div class="prog-track"><div class="prog-fill" style="width:${progress}%"></div></div>${sessionStatusHTML()}<button class="primary-btn day-session-action" ${progress>=100?'disabled':'onclick="startTodaySession()"'}>${progress>=100?'Séance terminée':(progress>0?'Reprendre ma séance':'Démarrer ma séance')}</button>${sessionPlanHTML()}</div>`;
 }
 
 function circuitHTML(ex){
@@ -3453,7 +3460,13 @@ function validateTimerExercise(){
   if(timer.sourceDay===null || timer.sourceIndex===null){
     return;
   }
-  toggleExerciseDone(timer.sourceDay,timer.sourceIndex);
+  const day=timer.sourceDay;
+  const index=Number(timer.sourceIndex);
+  const program=P();
+  if(!program[day] || !program[day].exercises || !program[day].exercises[index])return;
+  setDone(program[day].exercises[index],true,{silent:true},day);
+  renderAll();
+  saveAppState();
   updateTimerValidateButton();
 }
 function updateTimerValidateButton(){
@@ -3461,11 +3474,16 @@ function updateTimerValidateButton(){
   if(!btn)return;
   if(timer.freeMode || timer.sourceDay===null || timer.sourceIndex===null || !P()[timer.sourceDay] || !P()[timer.sourceDay].exercises[timer.sourceIndex]){
     btn.classList.add('hidden');
+    btn.classList.remove('done');
+    btn.disabled=false;
     return;
   }
   const ex=P()[timer.sourceDay].exercises[timer.sourceIndex];
   btn.classList.remove('hidden');
-  btn.textContent=getDone(ex)?'Exercice validé ✓':'Valider cet exercice';
+  const done=getDone(ex,timer.sourceDay);
+  btn.classList.toggle('done',done);
+  btn.disabled=done;
+  btn.textContent=done?'Exercice validé ✓':'Valider cet exercice';
 }
 
 
