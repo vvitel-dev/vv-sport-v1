@@ -91,12 +91,44 @@ const CUSTOM_PROFILE_DEFAULT={
 };
 function loadCustomProfile(){
   try{
-    return {...CUSTOM_PROFILE_DEFAULT,...JSON.parse(storageSafe.getItem('vv-custom-profile')||'{}')};
+    const profiles=loadCustomProfiles();
+    const activeId=storageSafe.getItem('vv-active-custom-profile');
+    const active=profiles.find(p=>p.id===activeId) || profiles[0];
+    return {...CUSTOM_PROFILE_DEFAULT,...(active||{})};
   }catch(e){
     return {...CUSTOM_PROFILE_DEFAULT};
   }
 }
+function profileDisplayName(p){
+  return (p&&p.name&&p.name.trim()) ? p.name.trim() : 'Profil perso';
+}
+function createProfileId(){
+  return 'profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
+}
+function loadCustomProfiles(){
+  try{
+    const saved=JSON.parse(storageSafe.getItem('vv-custom-profiles')||'[]');
+    if(Array.isArray(saved)&&saved.length)return saved.map(p=>({...CUSTOM_PROFILE_DEFAULT,...p}));
+  }catch(e){}
+  try{
+    const legacy=JSON.parse(storageSafe.getItem('vv-custom-profile')||'null');
+    if(legacy){
+      const migrated={...CUSTOM_PROFILE_DEFAULT,...legacy,id:createProfileId()};
+      storageSafe.setItem('vv-custom-profiles',JSON.stringify([migrated]));
+      storageSafe.setItem('vv-active-custom-profile',migrated.id);
+      return [migrated];
+    }
+  }catch(e){}
+  const initial={...CUSTOM_PROFILE_DEFAULT,id:createProfileId(),name:'vv'};
+  storageSafe.setItem('vv-custom-profiles',JSON.stringify([initial]));
+  storageSafe.setItem('vv-active-custom-profile',initial.id);
+  return [initial];
+}
+function saveCustomProfiles(list){
+  storageSafe.setItem('vv-custom-profiles',JSON.stringify(list));
+}
 let customProfile=loadCustomProfile();
+let customProfileOpen=storageSafe.getItem('vv-custom-profile-open')==='1';
 
 const CIRCUITS={
   'Circuit complet':[
@@ -1080,11 +1112,69 @@ function customProfileSummary(){
 
 function saveCustomProfileField(key,value){
   customProfile={...CUSTOM_PROFILE_DEFAULT,...customProfile,[key]:String(value)};
-  storageSafe.setItem('vv-custom-profile',JSON.stringify(customProfile));
+  if(!customProfile.id)customProfile.id=createProfileId();
+  const profiles=loadCustomProfiles();
+  const index=profiles.findIndex(p=>p.id===customProfile.id);
+  if(index>=0)profiles[index]=customProfile;
+  else profiles.push(customProfile);
+  saveCustomProfiles(profiles);
+  storageSafe.setItem('vv-active-custom-profile',customProfile.id);
   if(profile.level==='perso'){
     renderAll();
     saveAppState();
   }
+}
+
+function selectCustomProfile(id){
+  const found=loadCustomProfiles().find(p=>p.id===id);
+  if(!found)return;
+  customProfile={...CUSTOM_PROFILE_DEFAULT,...found};
+  storageSafe.setItem('vv-active-custom-profile',customProfile.id);
+  renderChoices();
+  if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
+  renderAll();
+  saveAppState();
+}
+
+function createCustomProfile(){
+  const profiles=loadCustomProfiles();
+  const created={...CUSTOM_PROFILE_DEFAULT,id:createProfileId(),name:'Profil '+(profiles.length+1)};
+  profiles.push(created);
+  saveCustomProfiles(profiles);
+  customProfile=created;
+  customProfileOpen=true;
+  storageSafe.setItem('vv-custom-profile-open','1');
+  storageSafe.setItem('vv-active-custom-profile',created.id);
+  profile.level='perso';
+  storageSafe.setItem('vv-level','perso');
+  renderChoices();
+  if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
+  renderAll();
+  saveAppState();
+}
+
+function deleteCustomProfile(id){
+  const profiles=loadCustomProfiles();
+  if(profiles.length<=1){
+    alert('Garde au moins un profil personnalisé.');
+    return;
+  }
+  if(!confirm('Supprimer ce profil personnalisé ?'))return;
+  const nextProfiles=profiles.filter(p=>p.id!==id);
+  saveCustomProfiles(nextProfiles);
+  customProfile={...CUSTOM_PROFILE_DEFAULT,...nextProfiles[0]};
+  storageSafe.setItem('vv-active-custom-profile',customProfile.id);
+  renderChoices();
+  if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
+  renderAll();
+  saveAppState();
+}
+
+function toggleCustomProfilePanel(){
+  customProfileOpen=!customProfileOpen;
+  storageSafe.setItem('vv-custom-profile-open',customProfileOpen?'1':'0');
+  renderChoices();
+  if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
 }
 
 function personalSets(base){
@@ -1556,11 +1646,21 @@ function selectMode(k){
 function customProfileFormHTML(){
   const c={...CUSTOM_PROFILE_DEFAULT,...customProfile};
   const selected=(key,value)=>String(c[key])===String(value)?'selected':'';
+  const profiles=loadCustomProfiles();
+  const profileOptions=profiles.map(p=>`<option value="${escapeHTML(p.id)}" ${p.id===c.id?'selected':''}>${escapeHTML(profileDisplayName(p))}</option>`).join('');
   return `
-    <div class="custom-profile-panel ${profile.level==='perso'?'active':''}">
-      <div class="custom-profile-head">
-        <strong>Profil personnalisé</strong>
-        <span>${escapeHTML(customProfileSummary())}</span>
+    <div class="custom-profile-panel ${profile.level==='perso'?'active':''} ${customProfileOpen?'open':''}">
+      <button class="custom-profile-head" type="button" onclick="toggleCustomProfilePanel()" aria-expanded="${customProfileOpen?'true':'false'}">
+        <span><strong>Profil personnalisé</strong><em>${escapeHTML(customProfileSummary())}</em></span>
+        <b>${customProfileOpen?'Fermer':'Modifier'}</b>
+      </button>
+      ${customProfileOpen?`
+      <div class="custom-profile-manager">
+        <label>Profil actif
+          <select onchange="selectCustomProfile(this.value)">${profileOptions}</select>
+        </label>
+        <button type="button" onclick="createCustomProfile()">Nouveau</button>
+        <button type="button" class="danger-mini" onclick="deleteCustomProfile('${escapeHTML(c.id)}')">Supprimer</button>
       </div>
       <div class="custom-form-grid">
         <label>Pseudo <input type="text" value="${escapeHTML(c.name)}" placeholder="Ton pseudo" oninput="saveCustomProfileField('name',this.value)"></label>
@@ -1625,6 +1725,7 @@ function customProfileFormHTML(){
           </select>
         </label>
       </div>
+      `:''}
     </div>
   `;
 }
@@ -1914,7 +2015,7 @@ function resetNotesData(){
 
 function resetProfileData(){
   if(!confirm('Réinitialiser le profil, le matériel et les options ? Progression, notes et stats restent conservées.'))return;
-  ['vv-level','vv-mode','vv-ready','vv-custom-profile','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound'].forEach(k=>storageSafe.removeItem(k));
+  ['vv-level','vv-mode','vv-ready','vv-custom-profile','vv-custom-profiles','vv-active-custom-profile','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound'].forEach(k=>storageSafe.removeItem(k));
   profile={level:'',mode:''};
   customProfile=loadCustomProfile();
   equipment={rings:true,push:true,db:true,treadmill:true,bike:true};
@@ -3331,6 +3432,7 @@ function syncTimerButtons(){
 
 
 function timerPhaseLabel(){
+  if(!timer.running && hasActiveTimerSession()) return 'Pause';
   if(timer.phase==='prep' || timer.pendingStart) return 'Préparation';
   if(timer.phase==='effort') return 'Effort';
   if(timer.phase==='rest') return 'Récupération';
@@ -3338,6 +3440,7 @@ function timerPhaseLabel(){
   return 'Bloc en cours';
 }
 function timerMeaningText(){
+  if(!timer.running && hasActiveTimerSession()) return 'Pause active : reprends quand tu es prêt, ou recommence ce bloc si tu veux repartir proprement.';
   if(timer.phase==='prep' || timer.pendingStart) return 'Prépare-toi : l’exercice démarre à la fin du décompte.';
   if(timer.phase==='effort') return 'Ce temps correspond à l’effort de l’exercice en cours.';
   if(timer.phase==='rest') return 'Ce temps correspond à la récupération avant la suite.';
