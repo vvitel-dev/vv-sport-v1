@@ -1384,6 +1384,8 @@ function adaptiveSetsFor(item,ctx){
 
 function makeAdaptiveExercise(item,ctx){
   const ex={
+    id:item.id,
+    doneKey:item.id,
     name:item.name,
     sets:adaptiveSetsFor(item,ctx),
     target:item.target,
@@ -1821,13 +1823,13 @@ function getHistory(){
 function saveHistory(list){
   storageSafe.setItem('vv-history',JSON.stringify(list.slice(-120)));
 }
-function logExerciseDone(ex){
+function logExerciseDone(ex,day=currentDay){
   if(!ex || ex.type==='repos')return;
   const list=getHistory();
   list.push({
     date:todayKey(),
     time:Date.now(),
-    day:currentDay,
+    day,
     exercise:ex.name,
     level:profile.level,
     mode:profile.mode,
@@ -2110,9 +2112,6 @@ function saveAppState(){
         sourceIndex:timer.sourceIndex,
         guided:timer.guided,
         guidedIndex:timer.guidedIndex,
-        guidedTotal:timer.guidedTotal,
-        guided:timer.guided,
-        guidedIndex:timer.guidedIndex,
         guidedTotal:timer.guidedTotal
       },
       guidedSession:guidedSession ? {
@@ -2247,12 +2246,25 @@ function boot(){
 
   showTab(currentTab||'today');
 }
-function key(ex,day=currentDay){return profile.level+'-'+profile.mode+'-'+day+'-'+ex.name}
-function getDone(ex,day=currentDay){return storageSafe.getItem('done-'+key(ex,day))==='1'}
+function exerciseDoneKey(ex){
+  if(!ex)return 'exercice';
+  return ex.doneKey || ex.id || ex.name || 'exercice';
+}
+function key(ex,day=currentDay){return profile.level+'-'+profile.mode+'-'+day+'-'+exerciseDoneKey(ex)}
+function legacyKey(ex,day=currentDay){return profile.level+'-'+profile.mode+'-'+day+'-'+((ex&&ex.name)||'exercice')}
+function getDone(ex,day=currentDay){
+  const stable='done-'+key(ex,day);
+  if(storageSafe.getItem(stable)==='1')return true;
+  const legacy='done-'+legacyKey(ex,day);
+  return legacy!==stable && storageSafe.getItem(legacy)==='1';
+}
 function setDone(ex,v,opts={},day=currentDay){
   const was=getDone(ex,day);
-  storageSafe.setItem('done-'+key(ex,day),v?'1':'0');
-  if(v&&!was&&ex.type!=='repos')logExerciseDone(ex);
+  const stable='done-'+key(ex,day);
+  const legacy='done-'+legacyKey(ex,day);
+  storageSafe.setItem(stable,v?'1':'0');
+  if(legacy!==stable)storageSafe.setItem(legacy,v?'1':'0');
+  if(v&&!was&&ex.type!=='repos')logExerciseDone(ex,day);
   if(!opts.silent){
     renderAll();
     saveAppState();
@@ -2263,7 +2275,7 @@ function setNote(ex,v,day=currentDay){storageSafe.setItem('note-'+key(ex,day),v)
 function pct(day){
   const ex=P()[day].exercises.filter(e=>e.type!=='repos');
   if(!ex.length)return 0;
-  return Math.round(ex.filter(e=>storageSafe.getItem('done-'+profile.level+'-'+profile.mode+'-'+day+'-'+e.name)==='1').length/ex.length*100);
+  return Math.round(ex.filter(e=>getDone(e,day)).length/ex.length*100);
 }
 
 
@@ -2473,13 +2485,16 @@ function buildSessionSteps(day){
   if(!program||!program.exercises)return [];
 
   const steps=[];
-  program.exercises.forEach(ex=>{
+  program.exercises.forEach((ex,exerciseIndex)=>{
     if(ex.type==='repos')return;
 
     if(ex.circuit&&ex.circuit.length){
       ex.circuit.forEach((step,idx)=>{
         steps.push({
           source:ex.name,
+          sourceKey:exerciseDoneKey(ex),
+          exerciseIndex,
+          isLastForExercise:idx===ex.circuit.length-1,
           name:step.name,
           effort:step.effort,
           rest:step.rest,
@@ -2494,6 +2509,9 @@ function buildSessionSteps(day){
     }else{
       steps.push({
         source:ex.name,
+        sourceKey:exerciseDoneKey(ex),
+        exerciseIndex,
+        isLastForExercise:true,
         name:ex.name,
         effort:ex.effort,
         rest:ex.rest,
@@ -2585,7 +2603,7 @@ function startTodaySession(){
   const program=P()[day];
   const steps=buildSessionSteps(day).filter(step=>{
     if(!program||!program.exercises)return true;
-    const original=program.exercises.find(ex=>ex.type!=='repos' && (ex.name===step.source || ex.name===step.name));
+    const original=program.exercises.find(ex=>ex.type!=='repos' && (exerciseDoneKey(ex)===step.sourceKey || ex.name===step.source || ex.name===step.name));
     return !original || !getDone(original,day);
   });
 
@@ -2636,6 +2654,8 @@ function startGuidedStep(index){
 function advanceGuidedSession(){
   if(!guidedSession)return false;
 
+  markGuidedStepDone();
+
   const nextIndex=guidedSession.index+1;
   if(nextIndex>=guidedSession.steps.length){
     finishGuidedSession();
@@ -2646,14 +2666,30 @@ function advanceGuidedSession(){
   return true;
 }
 
+function markGuidedStepDone(){
+  if(!guidedSession)return;
+  const step=guidedSession.steps[guidedSession.index];
+  if(!step || !step.isLastForExercise)return;
+  const program=P()[guidedSession.day];
+  if(!program || !program.exercises)return;
+  let ex=null;
+  if(Number.isInteger(step.exerciseIndex))ex=program.exercises[step.exerciseIndex];
+  if(!ex){
+    ex=program.exercises.find(item=>item.type!=='repos' && (exerciseDoneKey(item)===step.sourceKey || item.name===step.source));
+  }
+  if(ex && ex.type!=='repos')setDone(ex,true,{silent:true},guidedSession.day);
+}
+
 function finishGuidedSession(){
   if(!guidedSession)return;
+
+  markGuidedStepDone();
 
   const day=guidedSession.day;
   const program=P()[day];
   if(program&&program.exercises){
     program.exercises.forEach(ex=>{
-      if(ex.type!=='repos')setDone(ex,true,{silent:true});
+      if(ex.type!=='repos')setDone(ex,true,{silent:true},day);
     });
   }
 
@@ -2968,7 +3004,7 @@ function toggleCard(el){el.classList.toggle('open')}function resetDay(){
 }
 function resetWeek(){
   DAYS.forEach(d=>P()[d].exercises.forEach(e=>{
-    storageSafe.setItem('done-'+profile.level+'-'+profile.mode+'-'+d+'-'+e.name,'0');
+    setDone(e,false,{silent:true},d);
   }));
   renderAll();
   saveAppState();
@@ -3247,7 +3283,7 @@ function loadPrepTime(){
   if(select)select.value=String(timer.prep);
 }
 
-function setTimerState(seconds,ctx,phase='PRÊT',exercise=null,rest=0,exerciseData=null){clearInterval(timer.interval);timer={seconds,left:seconds,interval:null,running:false,phase:'effort',exercise,exerciseData,effort:seconds,rest,totalPhase:seconds,prep:timer.prep||5,pendingStart:false,circuit:exerciseData&&exerciseData.circuit?exerciseData.circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};document.getElementById('timer-context').textContent=ctx;document.getElementById('timer-phase').textContent=phase;document.getElementById('tip-effort').textContent=fmt(seconds);document.getElementById('tip-rest').textContent=rest?fmt(rest):'—';syncTimerLabels();updateTimer();saveAppState()}
+function setTimerState(seconds,ctx,phase='PRÊT',exercise=null,rest=0,exerciseData=null){clearInterval(timer.interval);timer={seconds,left:seconds,interval:null,running:false,phase:'effort',exercise,exerciseData,effort:seconds,rest,totalPhase:seconds,prep:timer.prep??5,pendingStart:false,circuit:exerciseData&&exerciseData.circuit?exerciseData.circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};document.getElementById('timer-context').textContent=ctx;document.getElementById('timer-phase').textContent=phase;document.getElementById('tip-effort').textContent=fmt(seconds);document.getElementById('tip-rest').textContent=rest?fmt(rest):'—';syncTimerLabels();updateTimer();saveAppState()}
 function setManualTimer(s){setTimerState(s,'Timer manuel','PRÊT',null,0,null);timer.exerciseData=null;updateTimerDetails()}
 function startExerciseTimer(day,i,options={}){
   const ex=P()[day].exercises[i];
@@ -3293,7 +3329,7 @@ function currentTimerName(){
 }
 
 function timerStatusLabel(){
-  if(timer.pendingStart || timer.phase==='prep')return 'Préparation';
+  if(timer.pendingStart || timer.phase==='prep')return 'Avant départ';
   if(timer.phase==='rest')return 'Récupération';
   if(timer.running)return 'Exercice en cours';
   if(hasActiveTimerSession())return 'En pause';
@@ -3310,7 +3346,7 @@ function timerContextLabel(){
     return status;
   }
 
-  if(status==='Préparation')return 'Prépare-toi · '+name;
+  if(status==='Avant départ')return 'Prépare-toi · '+name;
   if(status==='Récupération')return 'Récupération · '+name;
   if(status==='En pause')return 'En pause · '+name;
   if(status==='Terminé')return 'Terminé · '+name;
@@ -3440,7 +3476,7 @@ function syncTimerButtons(){
 
 function timerPhaseLabel(){
   if(!timer.running && hasActiveTimerSession()) return 'Pause';
-  if(timer.phase==='prep' || timer.pendingStart) return 'Préparation';
+  if(timer.phase==='prep' || timer.pendingStart) return 'Décompte';
   if(timer.phase==='effort') return 'Effort';
   if(timer.phase==='rest') return 'Récupération';
   if(timer.phase==='manual') return 'Minuteur manuel';
@@ -3629,7 +3665,7 @@ function startPrepCountdown(){
     if(ring)ring.style.setProperty('--timer-progress',progress+'%');
     if(fill)fill.style.width=progress+'%';
     if(percent)percent.textContent=progress+'%';
-    if(step)step.textContent='Préparation';
+    if(step)step.textContent='Décompte';
 
     if(prepLeft>0){
       document.getElementById('timer-display').textContent=fmt(prepLeft);
@@ -3865,7 +3901,7 @@ function __testTimerStateLabels(){
     restStatus,
     doneStatus,
     ok:
-      prepStatus==='Préparation' &&
+      prepStatus==='Avant départ' &&
       prepContext.includes('Prépare-toi') &&
       effortStatus==='Exercice en cours' &&
       effortContext.includes('Exercice · Ring push-ups tempo') &&
@@ -4001,6 +4037,124 @@ function __testCheckmarkCards(){
   }
 
   return stopped && immediate && after && restored;
+}
+
+function __testStableDoneKeys(){
+  const beforeLevel=profile.level;
+  const beforeMode=profile.mode;
+  const beforeDay=currentDay;
+
+  profile.level='perso';
+  profile.mode='adaptive';
+
+  let dayName=null;
+  let ex=null;
+  DAYS.some(day=>{
+    const p=P()[day];
+    if(!p||!p.exercises)return false;
+    const found=p.exercises.find(item=>item.type!=='repos' && item.doneKey);
+    if(found){
+      dayName=day;
+      ex=found;
+      return true;
+    }
+    return false;
+  });
+
+  if(!dayName || !ex){
+    profile.level=beforeLevel;
+    profile.mode=beforeMode;
+    currentDay=beforeDay;
+    return true;
+  }
+
+  const stable='done-'+key(ex,dayName);
+  const legacy='done-'+legacyKey(ex,dayName);
+  const originalStable=storageSafe.getItem(stable);
+  const originalLegacy=storageSafe.getItem(legacy);
+
+  storageSafe.setItem(stable,'0');
+  if(legacy!==stable)storageSafe.setItem(legacy,'0');
+
+  setDone(ex,true,{silent:true},dayName);
+  const renamed={...ex,name:ex.name+' test'};
+  const stableOk=getDone(renamed,dayName);
+  const pctOk=pct(dayName)>0;
+
+  setDone(ex,false,{silent:true},dayName);
+  const resetOk=!getDone(renamed,dayName);
+
+  if(originalStable===null)storageSafe.removeItem(stable);
+  else storageSafe.setItem(stable,originalStable);
+  if(legacy!==stable){
+    if(originalLegacy===null)storageSafe.removeItem(legacy);
+    else storageSafe.setItem(legacy,originalLegacy);
+  }
+
+  profile.level=beforeLevel;
+  profile.mode=beforeMode;
+  currentDay=beforeDay;
+
+  return stableOk && pctOk && resetOk;
+}
+
+function __testGuidedSessionValidation(){
+  const beforeGuided=guidedSession ? {...guidedSession} : null;
+  const beforeTimer={...timer};
+  const beforeDay=currentDay;
+
+  let dayName=null;
+  DAYS.some(day=>{
+    const p=P()[day];
+    if(p&&p.exercises&&p.exercises.some(ex=>ex.type!=='repos')){
+      dayName=day;
+      return true;
+    }
+    return false;
+  });
+
+  if(!dayName)return true;
+
+  const program=P()[dayName];
+  const originals=program.exercises.map(ex=>[
+    'done-'+key(ex,dayName),
+    storageSafe.getItem('done-'+key(ex,dayName)),
+    'done-'+legacyKey(ex,dayName),
+    storageSafe.getItem('done-'+legacyKey(ex,dayName))
+  ]);
+  program.exercises.forEach(ex=>setDone(ex,false,{silent:true},dayName));
+
+  const steps=buildSessionSteps(dayName);
+  const targetIndex=steps.findIndex(step=>step.isLastForExercise);
+  if(targetIndex<0){
+    originals.forEach(([stable,stableVal,legacy,legacyVal])=>{
+      if(stableVal===null)storageSafe.removeItem(stable); else storageSafe.setItem(stable,stableVal);
+      if(legacyVal===null)storageSafe.removeItem(legacy); else storageSafe.setItem(legacy,legacyVal);
+    });
+    guidedSession=beforeGuided;
+    Object.assign(timer,beforeTimer);
+    currentDay=beforeDay;
+    return true;
+  }
+
+  guidedSession={day:dayName,steps,index:targetIndex,startedAt:Date.now()};
+  markGuidedStepDone();
+
+  const step=steps[targetIndex];
+  const ex=program.exercises[step.exerciseIndex];
+  const marked=!!(ex&&getDone(ex,dayName));
+  const progressMoved=pct(dayName)>0;
+
+  originals.forEach(([stable,stableVal,legacy,legacyVal])=>{
+    if(stableVal===null)storageSafe.removeItem(stable); else storageSafe.setItem(stable,stableVal);
+    if(legacyVal===null)storageSafe.removeItem(legacy); else storageSafe.setItem(legacy,legacyVal);
+  });
+  guidedSession=beforeGuided;
+  Object.assign(timer,beforeTimer);
+  currentDay=beforeDay;
+  updateTimer();
+
+  return marked && progressMoved && steps.every(step=>step.sourceKey&&Number.isInteger(step.exerciseIndex));
 }
 
 function __testStorageSafe(){
@@ -4155,7 +4309,13 @@ function __testFullAuditState(){
     (typeof __testMediumBikeWednesday==='function' ? __testMediumBikeWednesday() : true) &&
     (typeof __testStorageSafe==='function' ? __testStorageSafe() : true) &&
     (typeof __testCheckmarkCards==='function' ? __testCheckmarkCards() : true) &&
+    (typeof __testStableDoneKeys==='function' ? __testStableDoneKeys() : true) &&
+    (typeof __testGuidedSessionValidation==='function' ? __testGuidedSessionValidation() : true) &&
     (typeof __testFirstStartTimerState==='function' ? __testFirstStartTimerState() : true) &&
+    (typeof __testTimerStateLabels==='function' ? __testTimerStateLabels().ok : true) &&
+    (typeof __testTimerPauseResumeRestart==='function' ? __testTimerPauseResumeRestart() : true) &&
+    (typeof __testTimerDetailsDynamic==='function' ? __testTimerDetailsDynamic().ok : true) &&
+    (typeof __testOptionsNoDuplicate==='function' ? __testOptionsNoDuplicate() : true) &&
     (typeof __testVisualMappings==='function' ? __testVisualMappings() : true)
   );
 }
