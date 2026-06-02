@@ -2568,10 +2568,36 @@ function tutorialSearchQuery(ex){
   const target=(ex&&ex.target)||'';
   return 'tuto '+name+' technique '+target;
 }
+// Tutorial modal functions
+function openTutorialModal(url,title='Tutoriel vidéo'){
+  const modal=document.getElementById('tutorial-modal');
+  const iframe=document.getElementById('tutorial-iframe');
+  const titleEl=document.getElementById('tutorial-modal-title');
+  if(!modal || !iframe)return;
+  iframe.src=youtubeEmbedUrl(url)||url;
+  if(titleEl)titleEl.textContent=title;
+  modal.classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function closeTutorialModal(){
+  const modal=document.getElementById('tutorial-modal');
+  const iframe=document.getElementById('tutorial-iframe');
+  if(!modal || !iframe)return;
+  modal.classList.add('hidden');
+  iframe.src='';
+  document.body.style.overflow='';
+}
+// Close modal on ESC key
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    const modal=document.getElementById('tutorial-modal');
+    if(modal && !modal.classList.contains('hidden'))closeTutorialModal();
+  }
+});
 function tutorialLinkHTML(ex){
   if(!ex || ex.type==='repos')return '';
   const url='https://www.youtube.com/results?search_query='+encodeURIComponent(tutorialSearchQuery(ex));
-  return '<a class="tutorial-link" href="'+url+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Voir un tuto YouTube</a>';
+  return '<button class="tutorial-link" type="button" onclick="event.stopPropagation();openTutorialModal(\''+escapeHTML(url)+'\',\'Tutoriel: '+escapeHTML(ex.name)+'\')">Voir un tuto YouTube</button>';
 }
 function formatHistoryDate(key){
   const d=dateFromKey(key);

@@ -175,6 +175,18 @@
     </div>
   </div>
 
+  <!-- Video Tutorial Modal -->
+  <div class="tutorial-modal hidden" id="tutorial-modal">
+    <div class="tutorial-modal-overlay" onclick="closeTutorialModal()"></div>
+    <div class="tutorial-modal-content">
+      <div class="tutorial-modal-header">
+        <span id="tutorial-modal-title">Tutoriel vidéo</span>
+        <button type="button" class="tutorial-modal-close" onclick="closeTutorialModal()" aria-label="Fermer">✕</button>
+      </div>
+      <iframe id="tutorial-iframe" class="tutorial-iframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  </div>
+
   <section id="tab-options" class="tab-page" hidden style="display:none">
   <div id="options-content"></div>
 </section>
