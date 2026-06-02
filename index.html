@@ -68,9 +68,10 @@
     </section>
   </div>
   <div id="tab-exercises" class="hidden tab-page" style="display:none">
-    <div class="page-header app-page-hero"><div><div class="page-title">Exercices</div><div class="page-sub">Bibliothèque complète · lancer un exercice seul</div></div></div>
+    <div class="page-header app-page-hero"><div><div class="page-title">Exercices</div><div class="page-sub">Bibliothèque complète · séance perso</div></div></div>
     <div class="section-label">Profil rapide</div>
     <div id="exercise-profile-quick" class="exercise-profile-quick"></div>
+    <div id="custom-session-builder" class="custom-session-builder"></div>
     <div class="section-label">Tous les exercices</div>
     <div id="exercise-library-list"></div>
   </div>
@@ -88,6 +89,14 @@
     <div class="timer-card">
       <div class="timer-label">Exercice sélectionné</div>
       <div class="timer-context" id="timer-context">Lance une séance du jour ou un exercice depuis l’onglet Exercices.</div>
+      <div class="timer-mode-switch" role="tablist" aria-label="Mode du minuteur">
+        <button id="timer-mode-exercise" class="timer-mode-btn active" type="button" onclick="activateExerciseTimerMode()">Exercice</button>
+        <button id="timer-mode-manual" class="timer-mode-btn" type="button" onclick="activateManualTimerMode()">Manuel</button>
+      </div>
+      <div class="timer-media-row">
+        <button class="timer-spotify-btn" id="timer-spotify-btn" type="button" onclick="openSpotifyMusic()">Ajouter musique</button>
+        <button class="timer-spotify-btn timer-youtube-btn" id="timer-youtube-btn" type="button" onclick="openYouTubeMusic()">Ajouter YouTube</button>
+      </div>
       <div class="timer-detail-card" id="timer-detail-card">
         <div class="timer-detail-row"><span>Cible</span><strong id="timer-target">—</strong></div>
         <div class="timer-detail-row"><span>Séries</span><strong id="timer-sets">—</strong></div>
@@ -103,10 +112,6 @@
           <option value="10">10s</option>
           <option value="15">15s</option>
         </select>
-      </div>
-      <div class="timer-color-preset-panel">
-        <span>Couleur</span>
-        <div class="timer-color-preset" id="timer-color-preset"></div>
       </div>
       <div class="timer-status" id="timer-status-label" aria-live="polite">En attente</div>
       <div class="timer-phase" id="timer-phase" aria-live="polite">PRÊT</div>
@@ -127,8 +132,14 @@
         <button class="preset-btn" type="button" onclick="setManualTimer(150)">2:30</button><button class="preset-btn" type="button" onclick="setManualTimer(180)">3min</button><button class="preset-btn" type="button" onclick="setManualTimer(240)">4min</button><button class="preset-btn" type="button" onclick="setManualTimer(300)">5min</button>
       </div>
     </div>
-    <div class="section-label" id="timer-detail-title">Détails de l’exercice</div>
-    <div class="tip-card"><div class="tip-row"><span>Effort prévu</span><span id="tip-effort">—</span></div><div class="tip-row"><span>Récupération prévue</span><span id="tip-rest">—</span></div><div class="tip-row"><span>Mode</span><span id="tip-mode">—</span></div></div>
+    <details class="timer-summary-details">
+      <summary class="section-label timer-summary-toggle" id="timer-detail-title">Détails de l’exercice</summary>
+      <div class="tip-card timer-summary-card">
+        <details class="tip-row tip-expand"><summary><span>Effort</span><span id="tip-effort">—</span></summary><p id="tip-effort-info">Durée du bloc en cours.</p></details>
+        <details class="tip-row tip-expand"><summary><span>Repos</span><span id="tip-rest">—</span></summary><p id="tip-rest-info">Temps de récupération prévu.</p></details>
+        <details class="tip-row tip-expand"><summary><span>Mode</span><span id="tip-mode">—</span></summary><p id="tip-mode-info">Niveau utilisé pour adapter la séance.</p></details>
+      </div>
+    </details>
   </div>
 
   <div id="tab-stats" class="tab-page" hidden style="display:none">
@@ -179,6 +190,25 @@
     <button class="tab-btn" id="tbtn-options" data-tab="options" type="button" aria-controls="tab-options">Options</button>
   </nav>
 </main>
+
+<div id="immersive-timer" class="immersive-timer hidden" hidden>
+  <button class="immersive-close" type="button" onclick="closeImmersiveTimer()" aria-label="Fermer le mode immersif">×</button>
+  <div class="immersive-kicker" id="immersive-status">Prêt</div>
+  <div class="immersive-title" id="immersive-title">Minuteur</div>
+  <div class="immersive-subtitle" id="immersive-subtitle">Exercice sélectionné</div>
+  <div class="immersive-ring" id="immersive-ring">
+    <div class="immersive-time" id="immersive-time">01:30</div>
+  </div>
+  <div class="immersive-meta">
+    <span id="immersive-step">En attente</span>
+    <strong id="immersive-percent">0%</strong>
+  </div>
+  <div class="immersive-bar"><div id="immersive-fill"></div></div>
+  <div class="immersive-actions">
+    <button class="immersive-main" type="button" onclick="immersiveToggleTimer()" id="immersive-main-btn">Commencer</button>
+    <button class="immersive-secondary hidden" type="button" onclick="immersiveRestartTimer()" id="immersive-restart-btn">Recommencer</button>
+  </div>
+</div>
 
 <script src="app.js" defer></script>
 </body>

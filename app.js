@@ -69,6 +69,275 @@ function setAppName(value){
   storageSafe.setItem('vv-app-name',appName);
   updateAppNameUI();
 }
+let spotifyUrl=storageSafe.getItem('vv-spotify-url')||'';
+let youtubeUrl=storageSafe.getItem('vv-youtube-url')||'';
+function cleanSpotifyUrl(value){
+  const url=String(value||'').trim();
+  if(!url)return '';
+  if(/^https:\/\/open\.spotify\.com\/(playlist|album|track|artist|show|episode)\//i.test(url))return url.slice(0,300);
+  if(/^spotify:(playlist|album|track|artist|show|episode):/i.test(url))return url.slice(0,300);
+  return '';
+}
+function spotifyEmbedUrl(value){
+  const url=cleanSpotifyUrl(value);
+  if(!url)return '';
+  let match=url.match(/^https:\/\/open\.spotify\.com\/(playlist|album|track|artist|show|episode)\/([^?/#]+)/i);
+  if(match)return 'https://open.spotify.com/embed/'+match[1].toLowerCase()+'/'+encodeURIComponent(match[2])+'?utm_source=vv_sport';
+  match=url.match(/^spotify:(playlist|album|track|artist|show|episode):([^?/#]+)/i);
+  if(match)return 'https://open.spotify.com/embed/'+match[1].toLowerCase()+'/'+encodeURIComponent(match[2])+'?utm_source=vv_sport';
+  return '';
+}
+function setSpotifyUrl(value){
+  spotifyUrl=String(value||'').trim().slice(0,300);
+  if(spotifyUrl)storageSafe.setItem('vv-spotify-url',spotifyUrl);
+  else storageSafe.removeItem('vv-spotify-url');
+  updateSpotifyUI();
+  saveAppState();
+}
+function cleanYouTubeUrl(value){
+  const url=String(value||'').trim();
+  if(!url)return '';
+  if(/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(url))return url.slice(0,300);
+  return '';
+}
+function youtubeEmbedUrl(value){
+  const url=cleanYouTubeUrl(value);
+  if(!url)return '';
+  let match=url.match(/[?&]list=([^&#]+)/i);
+  if(match)return 'https://www.youtube.com/embed/videoseries?list='+encodeURIComponent(match[1]);
+  match=url.match(/youtu\.be\/([^?/#]+)/i);
+  if(match)return 'https://www.youtube.com/embed/'+encodeURIComponent(match[1]);
+  match=url.match(/[?&]v=([^&#]+)/i);
+  if(match)return 'https://www.youtube.com/embed/'+encodeURIComponent(match[1]);
+  match=url.match(/youtube\.com\/shorts\/([^?/#]+)/i);
+  if(match)return 'https://www.youtube.com/embed/'+encodeURIComponent(match[1]);
+  match=url.match(/youtube\.com\/embed\/([^?/#]+)/i);
+  if(match)return 'https://www.youtube.com/embed/'+encodeURIComponent(match[1]);
+  return '';
+}
+function openYouTubeExternal(){
+  const url=cleanYouTubeUrl(youtubeUrl);
+  if(url)window.open(url,'_blank','noopener,noreferrer');
+}
+function setYouTubeUrl(value){
+  youtubeUrl=String(value||'').trim().slice(0,300);
+  if(youtubeUrl)storageSafe.setItem('vv-youtube-url',youtubeUrl);
+  else storageSafe.removeItem('vv-youtube-url');
+  updateYouTubeUI();
+  saveAppState();
+}
+function openSpotifyMusic(){
+  const embed=spotifyEmbedUrl(spotifyUrl);
+  if(!embed){
+    showTab('options');
+    setTimeout(()=>{
+      const section=document.querySelector('[data-options-section="music"]');
+      if(section){
+        section.open=true;
+        section.scrollIntoView({behavior:'smooth',block:'center'});
+      }
+      const input=document.getElementById('spotify-url-input');
+      if(input)input.focus();
+    },0);
+    return;
+  }
+  let sheet=document.getElementById('spotify-player-sheet');
+  if(!sheet){
+    sheet=document.createElement('div');
+    sheet.id='spotify-player-sheet';
+    sheet.className='spotify-player-sheet hidden';
+    sheet.innerHTML='<div class="spotify-player-head" id="spotify-player-drag"><span>Spotify</span><div><button type="button" onclick="minimizeSpotifyPlayer()" aria-label="Cacher Spotify">−</button><button type="button" onclick="closeSpotifyPlayer()" aria-label="Fermer Spotify">×</button></div></div><iframe id="spotify-player-frame" title="Lecteur Spotify" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>';
+    document.body.appendChild(sheet);
+    makeSpotifyPlayerDraggable(sheet);
+  }
+  const frame=document.getElementById('spotify-player-frame');
+  if(frame && frame.src!==embed)frame.src=embed;
+  sheet.classList.remove('hidden');
+  sheet.classList.remove('minimized');
+  document.body.classList.add('spotify-open');
+  updateSpotifyMiniButton(false);
+}
+function openYouTubeMusic(){
+  const embed=youtubeEmbedUrl(youtubeUrl);
+  if(!embed){
+    showTab('options');
+    setTimeout(()=>{
+      const section=document.querySelector('[data-options-section="music"]');
+      if(section){
+        section.open=true;
+        section.scrollIntoView({behavior:'smooth',block:'center'});
+      }
+      const input=document.getElementById('youtube-url-input');
+      if(input)input.focus();
+    },0);
+    return;
+  }
+  let sheet=document.getElementById('youtube-player-sheet');
+  if(!sheet){
+    sheet=document.createElement('div');
+    sheet.id='youtube-player-sheet';
+    sheet.className='spotify-player-sheet youtube-player-sheet hidden';
+    sheet.innerHTML='<div class="spotify-player-head" id="youtube-player-drag"><span>YouTube</span><div><button type="button" onclick="minimizeYouTubePlayer()" aria-label="Cacher YouTube">−</button><button type="button" onclick="closeYouTubePlayer()" aria-label="Fermer YouTube">×</button></div></div><iframe id="youtube-player-frame" title="Lecteur YouTube" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><div class="youtube-fallback" id="youtube-fallback"><strong>Lecture intégrée indisponible</strong><span>YouTube bloque parfois le lecteur intégré en local ou selon la vidéo.</span><button type="button" onclick="openYouTubeExternal()">Ouvrir sur YouTube</button></div>';
+    document.body.appendChild(sheet);
+    makePlayerDraggable(sheet,'#youtube-player-drag');
+  }
+  const frame=document.getElementById('youtube-player-frame');
+  const fallback=document.getElementById('youtube-fallback');
+  const localFile=location.protocol==='file:';
+  if(frame){
+    frame.classList.toggle('hidden',localFile);
+    if(localFile)frame.src='about:blank';
+    else if(frame.src!==embed)frame.src=embed;
+  }
+  if(fallback)fallback.classList.toggle('hidden',!localFile);
+  sheet.classList.remove('hidden','minimized');
+  updateYouTubeMiniButton(false);
+}
+function updateYouTubeMiniButton(show){
+  let mini=document.getElementById('youtube-mini-btn');
+  if(!mini){
+    mini=document.createElement('button');
+    mini.id='youtube-mini-btn';
+    mini.className='spotify-mini-btn youtube-mini-btn hidden';
+    mini.type='button';
+    mini.innerHTML='<span aria-hidden="true">▶</span>';
+    mini.setAttribute('aria-label','Réouvrir YouTube');
+    mini.title='Réouvrir YouTube';
+    mini.onclick=restoreYouTubePlayer;
+    document.body.appendChild(mini);
+  }
+  mini.classList.toggle('hidden',!show);
+}
+function minimizeYouTubePlayer(){
+  const sheet=document.getElementById('youtube-player-sheet');
+  if(sheet)sheet.classList.add('hidden','minimized');
+  updateYouTubeMiniButton(true);
+}
+function restoreYouTubePlayer(){
+  const sheet=document.getElementById('youtube-player-sheet');
+  if(!sheet){
+    openYouTubeMusic();
+    return;
+  }
+  sheet.classList.remove('hidden','minimized');
+  updateYouTubeMiniButton(false);
+}
+function closeYouTubePlayer(){
+  const sheet=document.getElementById('youtube-player-sheet');
+  if(sheet){
+    const frame=document.getElementById('youtube-player-frame');
+    if(frame)frame.src='about:blank';
+    sheet.classList.add('hidden');
+  }
+  updateYouTubeMiniButton(false);
+}
+function updateSpotifyMiniButton(show){
+  let mini=document.getElementById('spotify-mini-btn');
+  if(!mini){
+    mini=document.createElement('button');
+    mini.id='spotify-mini-btn';
+    mini.className='spotify-mini-btn hidden';
+    mini.type='button';
+    mini.innerHTML='<span aria-hidden="true">♪</span>';
+    mini.setAttribute('aria-label','Réouvrir Spotify');
+    mini.title='Réouvrir Spotify';
+    mini.onclick=restoreSpotifyPlayer;
+    document.body.appendChild(mini);
+  }
+  mini.classList.toggle('hidden',!show);
+}
+function minimizeSpotifyPlayer(){
+  const sheet=document.getElementById('spotify-player-sheet');
+  if(sheet)sheet.classList.add('hidden','minimized');
+  document.body.classList.remove('spotify-open');
+  updateSpotifyMiniButton(true);
+}
+function restoreSpotifyPlayer(){
+  const sheet=document.getElementById('spotify-player-sheet');
+  if(!sheet){
+    openSpotifyMusic();
+    return;
+  }
+  sheet.classList.remove('hidden','minimized');
+  document.body.classList.add('spotify-open');
+  updateSpotifyMiniButton(false);
+}
+function closeSpotifyPlayer(){
+  const sheet=document.getElementById('spotify-player-sheet');
+  if(sheet){
+    const frame=document.getElementById('spotify-player-frame');
+    if(frame)frame.src='about:blank';
+    sheet.classList.add('hidden');
+  }
+  document.body.classList.remove('spotify-open');
+  updateSpotifyMiniButton(false);
+}
+function makeSpotifyPlayerDraggable(sheet){
+  makePlayerDraggable(sheet,'#spotify-player-drag');
+}
+function makePlayerDraggable(sheet,handleSelector){
+  const handle=sheet.querySelector(handleSelector);
+  if(!handle || sheet.dataset.draggable==='1')return;
+  sheet.dataset.draggable='1';
+  let startX=0,startY=0,startLeft=0,startTop=0,dragging=false;
+  const move=(clientX,clientY)=>{
+    if(!dragging)return;
+    const nextLeft=Math.max(8,Math.min(window.innerWidth-sheet.offsetWidth-8,startLeft+(clientX-startX)));
+    const nextTop=Math.max(8,Math.min(window.innerHeight-sheet.offsetHeight-8,startTop+(clientY-startY)));
+    sheet.style.left=nextLeft+'px';
+    sheet.style.top=nextTop+'px';
+    sheet.style.right='auto';
+    sheet.style.bottom='auto';
+    sheet.style.margin='0';
+  };
+  handle.addEventListener('pointerdown',event=>{
+    if(event.target&&event.target.closest&&event.target.closest('button'))return;
+    dragging=true;
+    startX=event.clientX;
+    startY=event.clientY;
+    const rect=sheet.getBoundingClientRect();
+    startLeft=rect.left;
+    startTop=rect.top;
+    handle.setPointerCapture&&handle.setPointerCapture(event.pointerId);
+  });
+  handle.addEventListener('pointermove',event=>move(event.clientX,event.clientY));
+  handle.addEventListener('pointerup',()=>{dragging=false;});
+  handle.addEventListener('pointercancel',()=>{dragging=false;});
+}
+function updateSpotifyUI(){
+  const has=!!cleanSpotifyUrl(spotifyUrl);
+  const btn=document.getElementById('timer-spotify-btn');
+  if(btn){
+    btn.classList.toggle('connected',has);
+    btn.textContent=has?'Musique':'Ajouter musique';
+    btn.title=has?'Ouvrir Spotify':'Ajouter un lien Spotify';
+    btn.setAttribute('aria-label',btn.title);
+  }
+  const input=document.getElementById('spotify-url-input');
+  if(input && document.activeElement!==input && input.value!==spotifyUrl)input.value=spotifyUrl;
+  const openBtn=document.querySelector('.spotify-open-btn');
+  if(openBtn){
+    openBtn.classList.toggle('connected',has);
+    openBtn.textContent=has?'Ouvrir Spotify':'Ajouter un lien';
+  }
+}
+function updateYouTubeUI(){
+  const has=!!youtubeEmbedUrl(youtubeUrl);
+  const btn=document.getElementById('timer-youtube-btn');
+  if(btn){
+    btn.classList.toggle('connected',has);
+    btn.textContent=has?'YouTube':'Ajouter YouTube';
+    btn.title=has?'Ouvrir YouTube':'Ajouter un lien YouTube';
+    btn.setAttribute('aria-label',btn.title);
+  }
+  const input=document.getElementById('youtube-url-input');
+  if(input && document.activeElement!==input && input.value!==youtubeUrl)input.value=youtubeUrl;
+  const openBtn=document.querySelector('.youtube-open-btn');
+  if(openBtn){
+    openBtn.classList.toggle('connected',has);
+    openBtn.textContent=has?'Ouvrir YouTube':'Ajouter un lien';
+  }
+}
 const COLOR_THEMES={
   lime:{label:'Lime',accent:'#bdf45b',dim:'rgba(189,244,91,.10)',accent2:'#74d7e7',accent3:'#e9bd65',bg:'#0b0d0c',gradient:'linear-gradient(135deg,#d9ff63 0%,#9be84a 48%,#67e8f9 100%)'},
   ocean:{label:'Ocean',accent:'#67e8f9',dim:'rgba(103,232,249,.11)',accent2:'#bdf45b',accent3:'#60a5fa',bg:'#091012',gradient:'linear-gradient(135deg,#67e8f9 0%,#38bdf8 52%,#8b5cf6 100%)'},
@@ -121,13 +390,156 @@ function setTimerPresetColor(key){
   renderTimerColorPreset();
 }
 function renderTimerColorPreset(){
-  const box=document.getElementById('timer-color-preset');
-  if(!box)return;
+  const ring=document.getElementById('timer-ring');
+  if(!ring)return;
+  let tools=document.getElementById('timer-floating-tools');
+  if(!tools){
+    tools=document.createElement('div');
+    tools.id='timer-floating-tools';
+    tools.className='timer-floating-tools';
+    tools.innerHTML='<button class="timer-icon-btn" type="button" onclick="openImmersiveTimer()" title="Mode immersif" aria-label="Ouvrir le mode immersif"><span aria-hidden="true">⛶</span></button>';
+    ring.appendChild(tools);
+  }else if(tools.parentElement!==ring){
+    ring.appendChild(tools);
+  }
+  let box=document.getElementById('timer-color-preset');
+  if(!box){
+    box=document.createElement('div');
+    box.id='timer-color-preset';
+    box.className='timer-color-preset timer-color-floating';
+    tools.appendChild(box);
+  }else if(box.parentElement!==tools){
+    tools.appendChild(box);
+  }
   box.innerHTML=Object.entries(TIMER_PRESET_COLORS).map(([key,item])=>
     '<button class="timer-color-dot '+(timerPresetColorKey===key?'active':'')+'" type="button" onclick="setTimerPresetColor(\''+key+'\')" title="'+escapeHTML(item.label)+'" aria-label="Couleur minuteur '+escapeHTML(item.label)+'" aria-pressed="'+(timerPresetColorKey===key?'true':'false')+'" style="--timer-choice:'+(item.color||'var(--timer-color,var(--accent))')+'">'+
       '<span></span>'+
     '</button>'
   ).join('');
+}
+function isManualTimerMode(){
+  return timer.phase==='manual' || (timer.freeMode && !timer.exercise && !timer.exerciseData && timer.sourceDay===null);
+}
+function updateTimerModeSwitch(){
+  const manual=isManualTimerMode();
+  const manualBtn=document.getElementById('timer-mode-manual');
+  const exerciseBtn=document.getElementById('timer-mode-exercise');
+  if(manualBtn){
+    manualBtn.classList.toggle('active',manual);
+    manualBtn.setAttribute('aria-selected',manual?'true':'false');
+  }
+  if(exerciseBtn){
+    exerciseBtn.classList.toggle('active',!manual);
+    exerciseBtn.setAttribute('aria-selected',!manual?'true':'false');
+  }
+}
+function activateManualTimerMode(){
+  clearInterval(timer.interval);
+  guidedSession=null;
+  setTimerState(timerTune.effort||90,'Timer manuel','PRÊT',null,timerTune.rest||0,null);
+  timer.phase='manual';
+  timer.exercise=null;
+  timer.exerciseData=null;
+  timer.circuit=null;
+  timer.circuitIndex=0;
+  timer.sourceDay=null;
+  timer.sourceIndex=null;
+  timer.freeMode=true;
+  timer.guided=false;
+  timer.running=false;
+  timer.pendingStart=false;
+  updateTimerModeSwitch();
+  updateSessionRunner();
+  updateTimerDetails();
+  updateTimer();
+  saveAppState();
+}
+function activateExerciseTimerMode(){
+  if(timer.running || hasActiveTimerSession())return;
+  timer.phase='effort';
+  timer.freeMode=false;
+  updateTimerModeSwitch();
+  updateTimerDetails();
+  updateTimer();
+  previewSelectedTimerExercise();
+}
+function openImmersiveTimer(){
+  const view=document.getElementById('immersive-timer');
+  if(!view)return;
+  view.hidden=false;
+  view.classList.remove('hidden');
+  document.body.classList.add('immersive-open');
+  syncImmersiveTimer();
+}
+function closeImmersiveTimer(){
+  const view=document.getElementById('immersive-timer');
+  if(!view)return;
+  view.hidden=true;
+  view.classList.add('hidden');
+  document.body.classList.remove('immersive-open');
+}
+function immersiveToggleTimer(){
+  toggleTimer();
+  syncImmersiveTimer();
+  setTimeout(syncImmersiveTimer,0);
+}
+function immersiveRestartTimer(){
+  restartCurrentTimer();
+  syncImmersiveTimer();
+  setTimeout(syncImmersiveTimer,0);
+}
+function immersiveTimerTitle(){
+  if(timer.exercise)return timer.exercise;
+  if(timer.exerciseData&&timer.exerciseData.name)return timer.exerciseData.name;
+  if(guidedSession&&guidedSession.steps&&guidedSession.steps[guidedSession.index]){
+    return guidedSession.steps[guidedSession.index].name || 'Séance guidée';
+  }
+  if(timer.phase==='manual')return 'Minuteur manuel';
+  return 'Minuteur';
+}
+function immersiveTimerSubtitle(){
+  if(guidedSession&&guidedSession.day)return guidedSession.day+' · séance guidée';
+  if(timer.context)return timer.context;
+  if(timer.exerciseData&&timer.exerciseData.target)return timer.exerciseData.target;
+  return 'Exercice sélectionné';
+}
+function syncImmersiveTimer(){
+  const view=document.getElementById('immersive-timer');
+  if(!view || view.hidden)return;
+  const total=timer.totalPhase||timer.seconds||1;
+  const done=Math.min(100,Math.max(0,Math.round(((total-timer.left)/total)*100)));
+  const title=immersiveTimerTitle();
+  const subtitle=immersiveTimerSubtitle();
+  const status=timerStatusLabel ? timerStatusLabel() : 'Prêt';
+  const phase=timerPhaseLabel ? timerPhaseLabel() : 'En attente';
+  const time=document.getElementById('immersive-time');
+  const titleEl=document.getElementById('immersive-title');
+  const subtitleEl=document.getElementById('immersive-subtitle');
+  const statusEl=document.getElementById('immersive-status');
+  const stepEl=document.getElementById('immersive-step');
+  const pctEl=document.getElementById('immersive-percent');
+  const fill=document.getElementById('immersive-fill');
+  const ring=document.getElementById('immersive-ring');
+  const main=document.getElementById('immersive-main-btn');
+  const restart=document.getElementById('immersive-restart-btn');
+  if(time)time.textContent=fmt(timer.left);
+  if(titleEl)titleEl.textContent=title;
+  if(subtitleEl)subtitleEl.textContent=subtitle;
+  if(statusEl)statusEl.textContent=status;
+  if(stepEl)stepEl.textContent=phase;
+  if(pctEl)pctEl.textContent=done+'%';
+  if(fill)fill.style.width=done+'%';
+  if(ring)ring.style.setProperty('--timer-progress',done+'%');
+  if(main){
+    main.textContent=timer.running?'Pause':(hasActiveTimerSession()?'Reprendre':'Commencer');
+    main.classList.toggle('running',timer.running);
+    main.setAttribute('aria-label',main.textContent+' le minuteur');
+  }
+  if(restart){
+    const showRestart=canRestartTimer() && !timer.running && (hasActiveTimerSession() || timer.left===0 || timer.phase==='manual');
+    restart.classList.toggle('hidden',!showRestart);
+    restart.disabled=!showRestart;
+  }
 }
 function setColorTheme(key){
   if(!COLOR_THEMES[key])return;
@@ -790,7 +1202,7 @@ function renderEquipment(){
    if(el)el.classList.toggle('active',equipment[k]);
  });
 }let currentDay=(typeof getRealDay==='function'?getRealDay():'Lundi');let activeTab='today';
-let timer={seconds:90,left:90,interval:null,running:false,phase:'manual',exercise:null,exerciseData:null,effort:90,rest:0,totalPhase:90,prep:5,pendingStart:false,circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};
+let timer={seconds:90,left:90,interval:null,running:false,phase:'manual',context:'Timer manuel',exercise:null,exerciseData:null,effort:90,rest:0,totalPhase:90,prep:5,pendingStart:false,circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};
 let timerTune={
   effort:Math.max(15,Number(storageSafe.getItem('vv-timer-tune-effort'))||90),
   rest:Math.max(0,Number(storageSafe.getItem('vv-timer-tune-rest'))||30),
@@ -2147,11 +2559,13 @@ function resetNotesData(){
 
 function resetProfileData(){
   if(!confirm('Réinitialiser le profil, le matériel et les options ? Progression, notes et stats restent conservées.'))return;
-  ['vv-level','vv-mode','vv-ready','vv-custom-profile','vv-custom-profiles','vv-active-custom-profile','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound','vv-color-theme','vv-profile-color','vv-timer-color','vv-timer-preset-color'].forEach(k=>storageSafe.removeItem(k));
+  ['vv-level','vv-mode','vv-ready','vv-custom-profile','vv-custom-profiles','vv-active-custom-profile','vv-eq-rings','vv-eq-push','vv-eq-db','vv-eq-treadmill','vv-eq-bike','vv-prep-time','vv-sound','vv-color-theme','vv-profile-color','vv-timer-color','vv-timer-preset-color','vv-spotify-url','vv-youtube-url'].forEach(k=>storageSafe.removeItem(k));
   profile={level:'',mode:''};
   customProfile=loadCustomProfile();
   equipment={rings:true,push:true,db:true,treadmill:true,bike:true};
   soundEnabled=true;
+  spotifyUrl='';
+  youtubeUrl='';
   colorThemeKey='lime';
   applyColorTheme(colorThemeKey);
   timerPresetColorKey='auto';
@@ -2225,6 +2639,7 @@ function saveAppState(){
         left:timer.left,
         running:false,
         phase:timer.phase,
+        context:timer.context,
         exercise:timer.exercise,
         exerciseData:timer.exerciseData,
         effort:timer.effort,
@@ -2244,8 +2659,11 @@ function saveAppState(){
         day:guidedSession.day,
         steps:guidedSession.steps,
         index:guidedSession.index,
+        label:guidedSession.label,
+        custom:guidedSession.custom,
         startedAt:guidedSession.startedAt
       } : null,
+      customSessionSelection,
       savedAt:Date.now()
     };
     storageSafe.setItem('vv-app-state',JSON.stringify(state));
@@ -2283,6 +2701,8 @@ function restoreAppState(){
   }
 
   guidedSession=state.guidedSession || null;
+  customSessionSelection=Array.isArray(state.customSessionSelection) ? state.customSessionSelection : customSessionSelection;
+  storageSafe.setItem('vv-custom-session-selection',JSON.stringify(customSessionSelection));
 
   document.getElementById('launch-screen').classList.add('hidden');
   document.getElementById('setup-screen').classList.add('hidden');
@@ -2564,6 +2984,29 @@ function renderOptions(){
         ${colorThemeOptionsHTML()}
       </details>
 
+      <details class="options-section options-dropdown" data-options-section="music"${optionOpenAttr('music')}>
+        <summary><span>Musique</span></summary>
+        <div class="spotify-options">
+          <label class="spotify-field">
+            <span>Lien Spotify</span>
+            <input id="spotify-url-input" type="url" value="${escapeHTML(spotifyUrl)}" placeholder="https://open.spotify.com/playlist/..." oninput="setSpotifyUrl(this.value)">
+          </label>
+          <div class="spotify-actions">
+            <button type="button" class="spotify-open-btn ${cleanSpotifyUrl(spotifyUrl)?'connected':''}" onclick="openSpotifyMusic()">${cleanSpotifyUrl(spotifyUrl)?'Ouvrir Spotify':'Ajouter un lien'}</button>
+            <button type="button" class="spotify-clear-btn" onclick="setSpotifyUrl('')">Supprimer</button>
+          </div>
+          <label class="spotify-field">
+            <span>Lien YouTube</span>
+            <input id="youtube-url-input" type="url" value="${escapeHTML(youtubeUrl)}" placeholder="https://youtube.com/watch?v=... ou playlist" oninput="setYouTubeUrl(this.value)">
+          </label>
+          <div class="spotify-actions">
+            <button type="button" class="spotify-open-btn youtube-open-btn ${youtubeEmbedUrl(youtubeUrl)?'connected':''}" onclick="openYouTubeMusic()">${youtubeEmbedUrl(youtubeUrl)?'Ouvrir YouTube':'Ajouter un lien'}</button>
+            <button type="button" class="spotify-clear-btn" onclick="setYouTubeUrl('')">Supprimer</button>
+          </div>
+          <p class="options-section-note">Colle un lien Spotify ou YouTube. L’app l’ouvre en overlay pendant ta séance sans modifier tes stats.</p>
+        </div>
+      </details>
+
       <details class="options-section options-dropdown" data-options-section="equipment"${optionOpenAttr('equipment')}>
         <summary><span>Matériel disponible</span></summary>
         <div class="choice-grid">${equipmentChoicesHTML()}</div>
@@ -2613,6 +3056,8 @@ function renderOptions(){
       <button class="primary-btn" onclick="saveProfileAndEnter()">Appliquer</button>
     </div>
   `;
+  updateSpotifyUI();
+  updateYouTubeUI();
   if(currentTab==='options')renderHeaderNavControls();
 }
 
@@ -2641,6 +3086,75 @@ function renderAll() {
 function renderDays(){document.getElementById('day-scroller').innerHTML=DAYS.map(d=>`<button class="day-chip ${d===currentDay?'active':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);renderAll()">${d}</button>`).join('')}
 
 let guidedSession=null;
+let customSessionSelection=[];
+try{
+  customSessionSelection=JSON.parse(storageSafe.getItem('vv-custom-session-selection')||'[]');
+  if(!Array.isArray(customSessionSelection))customSessionSelection=[];
+}catch(e){
+  customSessionSelection=[];
+}
+
+function libraryItemKey(item){
+  if(!item||!item.ex)return '';
+  const ex=item.ex;
+  if(item.libraryOnly)return 'lib|'+(ex.name||'')+'|'+(ex.target||'');
+  return 'program|'+(item.day||'')+'|'+(ex.name||'')+'|'+(ex.target||'')+'|'+(ex.sets||'');
+}
+
+function saveCustomSessionSelection(){
+  storageSafe.setItem('vv-custom-session-selection',JSON.stringify(customSessionSelection));
+  saveAppState();
+}
+
+function getCustomSessionItems(){
+  const items=getExerciseLibraryItems();
+  const map=new Map(items.map(item=>[libraryItemKey(item),item]));
+  return customSessionSelection.map(key=>map.get(key)).filter(Boolean);
+}
+
+function customSessionMinutes(items=getCustomSessionItems()){
+  const seconds=items.reduce((sum,item)=>{
+    const ex=item.ex;
+    if(ex.circuit&&ex.circuit.length)return sum+ex.circuit.reduce((s,step)=>s+(step.effort||0)+(step.rest||0),0);
+    return sum+(ex.effort||60)+(ex.rest||0);
+  },0);
+  return Math.max(1,Math.round(seconds/60));
+}
+
+function exerciseToCustomSteps(item){
+  if(!item||!item.ex)return [];
+  const ex=item.ex;
+  if(ex.circuit&&ex.circuit.length){
+    return ex.circuit.map((step,idx)=>({
+      custom:true,
+      source:ex.name,
+      isLastForExercise:idx===ex.circuit.length-1,
+      name:step.name,
+      effort:step.effort,
+      rest:step.rest,
+      target:ex.target||'Circuit',
+      sets:(idx+1)+'/'+ex.circuit.length,
+      how:'Circuit : '+ex.name+'. Étape '+(idx+1)+' : '+step.name+'.',
+      tips:ex.tips||'Garde un mouvement propre et enchaîne calmement.',
+      svg:ex.svg||'default',
+      original:ex
+    }));
+  }
+  return [{
+    custom:true,
+    source:ex.name,
+    isLastForExercise:true,
+    name:ex.name,
+    effort:ex.effort||60,
+    rest:ex.rest||0,
+    target:ex.target,
+    sets:ex.sets,
+    how:ex.how,
+    tips:ex.tips,
+    svg:ex.svg,
+    original:ex
+  }];
+}
 
 function buildSessionSteps(day){
   const program=P()[day];
@@ -2830,6 +3344,7 @@ function advanceGuidedSession(){
 
 function markGuidedStepDone(){
   if(!guidedSession)return;
+  if(guidedSession.custom)return;
   const step=guidedSession.steps[guidedSession.index];
   if(!step || !step.isLastForExercise)return;
   const program=P()[guidedSession.day];
@@ -2848,8 +3363,9 @@ function finishGuidedSession(){
   markGuidedStepDone();
 
   const day=guidedSession.day;
+  const isCustom=!!guidedSession.custom;
   const program=P()[day];
-  if(program&&program.exercises){
+  if(!isCustom&&program&&program.exercises){
     program.exercises.forEach(ex=>{
       if(ex.type!=='repos')setDone(ex,true,{silent:true},day);
     });
@@ -2858,7 +3374,7 @@ function finishGuidedSession(){
   guidedSession=null;
   timer.guided=false;
   updateSessionRunner();
-  document.getElementById('timer-context').textContent='Séance terminée';
+  document.getElementById('timer-context').textContent=isCustom?'Séance perso terminée':'Séance terminée';
   document.getElementById('timer-phase').textContent='TERMINÉ';
   renderAll();
 }
@@ -2904,6 +3420,22 @@ function todayNextExerciseText(){
 function updateSessionRunner(){
   const card=document.getElementById('session-runner-card');
   if(!card)return;
+
+  if(guidedSession&&guidedSession.custom){
+    const total=guidedSession.steps.length||0;
+    const current=Math.min(total,(guidedSession.index||0)+1);
+    const step=guidedSession.steps[guidedSession.index]||null;
+    card.classList.remove('hidden','session-complete');
+    card.innerHTML=`
+      <div class="session-line">
+        <span>Séance perso</span>
+        <strong>${current}/${total}</strong>
+      </div>
+      <div class="session-next">${step?'En cours : '+escapeHTML(step.name):'Séance personnalisée prête.'}</div>
+      <button class="session-runner-stop" type="button" onclick="stopGuidedSession()">Arrêter la séance</button>
+    `;
+    return;
+  }
 
   const p=todayExerciseProgress();
   if(p.total===0){
@@ -3033,8 +3565,19 @@ function renderExercises(){
     const visualKey=chooseExerciseVisual(ex);
     const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
     const checkLabel=ex.type==='repos'?'Valider le repos':'Valider l’exercice';
-    return `<div class="ex-card ${ex.type==='repos'?'rest-card':''} ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div><div class="ex-meta"><strong>Cible :</strong> ${ex.target}<br><strong>Comment faire :</strong> ${ex.how}<br><strong>Conseil :</strong> ${ex.tips}</div>${tutorialLinkHTML(ex)}${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
+    return `<div class="ex-card ${ex.type==='repos'?'rest-card':''} ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div>${exerciseMetaHTML(ex)}${tutorialLinkHTML(ex)}${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
   }).join('');
+}
+
+function exerciseMetaHTML(ex){
+  const rows=[
+    ['Cible',ex.target||'—'],
+    ['Faire',ex.how||'Fais le mouvement avec contrôle.'],
+    ['Conseil',ex.tips||'Garde une technique propre.']
+  ];
+  return '<div class="ex-meta ex-meta-grid">'+rows.map(([label,value])=>
+    '<div class="ex-meta-row"><span>'+escapeHTML(label)+'</span><p>'+escapeHTML(value)+'</p></div>'
+  ).join('')+'</div>';
 }
 
 
@@ -3051,7 +3594,9 @@ function getExerciseLibraryItems(){
       const key=(ex.name||'')+'|'+(ex.target||'')+'|'+(ex.sets||'');
       if(seen.has(key))return;
       seen.add(key);
-      items.push({day,index,ex,theme:inferExerciseTheme(ex),source:'programme'});
+      const item={day,index,ex,theme:inferExerciseTheme(ex),source:'programme'};
+      item.key=libraryItemKey(item);
+      items.push(item);
     });
   });
   const ctx=adaptiveContext();
@@ -3061,7 +3606,9 @@ function getExerciseLibraryItems(){
     const key=(ex.name||'')+'|'+(ex.target||'');
     if(seen.has(key))return;
     seen.add(key);
-    items.push({day:null,index:null,ex,theme:item.movement,source:'bibliotheque',libraryOnly:true});
+    const libraryItem={day:null,index:null,ex,theme:item.movement,source:'bibliotheque',libraryOnly:true};
+    libraryItem.key=libraryItemKey(libraryItem);
+    items.push(libraryItem);
   });
   return items;
 }
@@ -3093,12 +3640,17 @@ function exerciseCardHTML(item,libraryIndex){
   const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
   const timing=ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort||60)+' · Récupération '+fmt(ex.rest||0);
   const sourceLabel=item.source==='programme' ? item.day+' · programme' : 'Bibliothèque · exercice seul';
-  return `<div class="ex-card library-ex-card" onclick="toggleCard(this)">
+  const selected=customSessionSelection.includes(item.key||libraryItemKey(item));
+  const sessionKey=item.key||libraryItemKey(item);
+  return `<div class="ex-card library-ex-card ${selected?'session-selected':''}" data-session-key="${escapeHTML(sessionKey)}" onclick="toggleCard(this)">
     <div class="ex-header">
-      <div class="ex-title-block">
-        <div class="ex-name">${ex.name}</div>
-        <div class="ex-sets">${ex.sets||sourceLabel}</div>
-        <div class="exercise-source">${sourceLabel}</div>
+      <div class="library-title-row">
+        <div class="ex-title-block">
+          <div class="ex-name">${ex.name}</div>
+          <div class="ex-sets">${ex.sets||sourceLabel}</div>
+          <div class="exercise-source">${sourceLabel}</div>
+          <button type="button" class="select-session-btn ${selected?'active':''}" data-session-key="${escapeHTML(sessionKey)}" title="${selected?'Retirer de la séance':'Ajouter à la séance'}" aria-label="${selected?'Retirer de la séance':'Ajouter à la séance'}" aria-pressed="${selected?'true':'false'}" onclick="event.preventDefault();event.stopPropagation();toggleCustomSessionItem(${libraryIndex})">${selected?'Ajouté':' + Séance'}</button>
+        </div>
       </div>
       <div class="ex-actions">
         <button type="button" class="mini-timer-btn" title="Lancer l’exercice" aria-label="Lancer l’exercice" onclick="event.preventDefault();event.stopPropagation();startLibraryExercise(${libraryIndex})">▶</button>
@@ -3107,12 +3659,87 @@ function exerciseCardHTML(item,libraryIndex){
     </div>
     <div class="ex-body">
       <div class="ex-visual" data-visual="${visualKey}">${visual}</div>
-      <div class="ex-meta"><strong>Cible :</strong> ${ex.target||'—'}<br><strong>Comment faire :</strong> ${ex.how||'Fais le mouvement avec contrôle.'}<br><strong>Conseil :</strong> ${ex.tips||'Garde une technique propre.'}</div>
+      ${exerciseMetaHTML(ex)}
       ${tutorialLinkHTML(ex)}
       <div class="ex-timer-line">${timing}</div>
       ${circuitHTML(ex)}
     </div>
   </div>`;
+}
+
+function syncCustomSessionCards(){
+  document.querySelectorAll('.library-ex-card[data-session-key]').forEach(card=>{
+    const key=card.getAttribute('data-session-key');
+    const selected=customSessionSelection.includes(key);
+    card.classList.toggle('session-selected',selected);
+  });
+  document.querySelectorAll('.select-session-btn[data-session-key]').forEach(btn=>{
+    const key=btn.getAttribute('data-session-key');
+    const selected=customSessionSelection.includes(key);
+    btn.classList.toggle('active',selected);
+    btn.textContent=selected?'Ajouté':'+ Séance';
+    btn.title=selected?'Retirer de la séance':'Ajouter à la séance';
+    btn.setAttribute('aria-label',selected?'Retirer de la séance':'Ajouter à la séance');
+    btn.setAttribute('aria-pressed',selected?'true':'false');
+  });
+}
+
+function renderCustomSessionBuilder(){
+  const box=document.getElementById('custom-session-builder');
+  if(!box)return;
+  const items=getCustomSessionItems();
+  if(!items.length){
+    box.innerHTML='<div class="custom-session-empty">Sélectionne plusieurs exercices avec + pour créer ta séance.</div>';
+    box.classList.remove('has-items');
+    return;
+  }
+
+  box.classList.add('has-items');
+  box.innerHTML=
+    '<div class="custom-session-head"><div><span>Séance personnalisée</span><strong>'+items.length+' exercice'+(items.length>1?'s':'')+' · ~'+customSessionMinutes(items)+' min</strong></div><button type="button" onclick="clearCustomSession()">Vider</button></div>'+
+    '<div class="custom-session-list">'+items.map((item,index)=>
+      '<div class="custom-session-item"><span>'+(index+1)+'. '+escapeHTML(item.ex.name)+'</span><button type="button" aria-label="Retirer '+escapeHTML(item.ex.name)+'" onclick="removeCustomSessionItem('+index+')">×</button></div>'
+    ).join('')+'</div>'+
+    '<button class="custom-session-start" type="button" onclick="startCustomSession()">Lancer ma séance perso</button>';
+}
+
+function toggleCustomSessionItem(libraryIndex){
+  const item=getExerciseLibraryItems()[Number(libraryIndex)];
+  if(!item)return;
+  const key=item.key||libraryItemKey(item);
+  if(customSessionSelection.includes(key)){
+    customSessionSelection=customSessionSelection.filter(k=>k!==key);
+  }else{
+    customSessionSelection.push(key);
+  }
+  saveCustomSessionSelection();
+  renderCustomSessionBuilder();
+  syncCustomSessionCards();
+}
+
+function removeCustomSessionItem(index){
+  customSessionSelection.splice(Number(index),1);
+  saveCustomSessionSelection();
+  renderCustomSessionBuilder();
+  syncCustomSessionCards();
+}
+
+function clearCustomSession(){
+  customSessionSelection=[];
+  saveCustomSessionSelection();
+  renderCustomSessionBuilder();
+  syncCustomSessionCards();
+}
+
+function startCustomSession(){
+  const items=getCustomSessionItems();
+  const steps=items.flatMap(exerciseToCustomSteps).filter(step=>step.effort>0);
+  if(!steps.length)return;
+  guidedSession={day:'Séance perso',label:'Séance personnalisée',custom:true,steps,index:0,startedAt:Date.now()};
+  showTab('timer');
+  updateSessionRunner();
+  startGuidedStep(0);
+  saveAppState();
 }
 
 function renderExerciseProfileQuick(){
@@ -3142,6 +3769,7 @@ function selectExerciseLevel(k){
 
 function renderExerciseLibrary(){
   renderExerciseProfileQuick();
+  renderCustomSessionBuilder();
   const list=document.getElementById('exercise-library-list');
   if(!list)return;
 
@@ -3154,7 +3782,7 @@ function renderExerciseLibrary(){
   list.innerHTML=EXERCISE_THEME_ORDER.map(theme=>{
     const group=items.map((item,index)=>({...item,libraryIndex:index})).filter(item=>item.theme===theme);
     if(!group.length)return '';
-    return `<details class="exercise-theme-section" ${theme==='push'?'open':''}>
+    return `<details class="exercise-theme-section">
       <summary class="exercise-theme-head">
         <span>${EXERCISE_THEME_LABELS[theme]}</span>
         <strong>${group.length}</strong>
@@ -3610,7 +4238,7 @@ function loadPrepTime(){
   renderTimerTune();
 }
 
-function setTimerState(seconds,ctx,phase='PRÊT',exercise=null,rest=0,exerciseData=null){clearInterval(timer.interval);timer={seconds,left:seconds,interval:null,running:false,phase:'effort',exercise,exerciseData,effort:seconds,rest,totalPhase:seconds,prep:timer.prep??5,pendingStart:false,circuit:exerciseData&&exerciseData.circuit?exerciseData.circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};document.getElementById('timer-context').textContent=ctx;document.getElementById('timer-phase').textContent=phase;document.getElementById('tip-effort').textContent=fmt(seconds);document.getElementById('tip-rest').textContent=rest?fmt(rest):'—';syncTimerLabels();updateTimer();saveAppState()}
+function setTimerState(seconds,ctx,phase='PRÊT',exercise=null,rest=0,exerciseData=null){clearInterval(timer.interval);timer={seconds,left:seconds,interval:null,running:false,phase:'effort',context:ctx,exercise,exerciseData,effort:seconds,rest,totalPhase:seconds,prep:timer.prep??5,pendingStart:false,circuit:exerciseData&&exerciseData.circuit?exerciseData.circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};document.getElementById('timer-context').textContent=ctx;document.getElementById('timer-phase').textContent=phase;document.getElementById('tip-effort').textContent=fmt(seconds);document.getElementById('tip-rest').textContent=rest?fmt(rest):'—';syncTimerLabels();updateTimer();saveAppState()}
 function renderTimerTune(){
   const effort=document.getElementById('timer-tune-effort');
   const rest=document.getElementById('timer-tune-rest');
@@ -3638,9 +4266,20 @@ function applyTunedManualTimer(){
   storageSafe.setItem('vv-prep-time',String(timer.prep));
   setTimerState(timerTune.effort,'Timer manuel','PRÊT',null,timerTune.rest,null);
   timer.phase='manual';
+  timer.context='Timer manuel';
+  timer.exercise=null;
   timer.exerciseData=null;
+  timer.circuit=null;
+  timer.sourceDay=null;
+  timer.sourceIndex=null;
   timer.freeMode=true;
+  timer.guided=false;
+  timer.running=false;
+  timer.pendingStart=false;
+  updateTimerModeSwitch();
   updateTimerDetails();
+  updateTimer();
+  saveAppState();
   renderTimerTune();
 }
 function setManualTimer(s){
@@ -3649,9 +4288,20 @@ function setManualTimer(s){
   renderTimerTune();
   setTimerState(s,'Timer manuel','PRÊT',null,timerTune.rest||0,null);
   timer.phase='manual';
+  timer.context='Timer manuel';
+  timer.exercise=null;
   timer.exerciseData=null;
+  timer.circuit=null;
+  timer.sourceDay=null;
+  timer.sourceIndex=null;
   timer.freeMode=true;
+  timer.guided=false;
+  timer.running=false;
+  timer.pendingStart=false;
+  updateTimerModeSwitch();
   updateTimerDetails();
+  updateTimer();
+  saveAppState();
 }
 function startExerciseTimer(day,i,options={}){
   const ex=P()[day].exercises[i];
@@ -3702,6 +4352,7 @@ function timerStatusLabel(){
   if(timer.running)return 'Exercice en cours';
   if(hasActiveTimerSession())return 'En pause';
   if(timer.left===0 && timer.exercise)return 'Terminé';
+  if(isManualTimerMode())return 'Minuteur manuel';
   return 'Exercice sélectionné';
 }
 
@@ -3727,6 +4378,8 @@ function syncTimerLabels(){
   const contextEl=document.getElementById('timer-context');
   const card=document.querySelector('.timer-card');
   const status=timerStatusLabel();
+  updateSpotifyUI();
+  updateYouTubeUI();
 
   if(statusEl)statusEl.textContent=status;
   if(contextEl)contextEl.textContent=timerContextLabel();
@@ -3737,13 +4390,17 @@ function syncTimerLabels(){
   document.body.classList.toggle('timer-is-paused',status==='En pause');
 
   if(card){
+    const labelEl=card.querySelector('.timer-label');
+    if(labelEl)labelEl.textContent=isManualTimerMode()?'Minuteur manuel':'Exercice sélectionné';
     card.classList.toggle('is-running',timer.running);
     card.classList.toggle('is-paused',status==='En pause');
     card.classList.toggle('is-rest',timer.phase==='rest');
     card.classList.toggle('is-prep',timer.pendingStart||timer.phase==='prep');
     card.classList.toggle('is-done',status==='Terminé');
-    card.classList.toggle('has-session',canRestartTimer());
+    card.classList.toggle('has-session',canRestartTimer()&&!isManualTimerMode());
+    card.classList.toggle('is-manual',isManualTimerMode());
   }
+  updateTimerModeSwitch();
 }
 
 
@@ -3759,6 +4416,7 @@ function timerModeLabel(){
 function timerDetailTitle(){
   if(timer.phase==='rest')return 'Récupération';
   if(timer.pendingStart || timer.phase==='prep')return 'Préparation';
+  if(isManualTimerMode())return 'Mode manuel';
   if(timer.exercise || timer.exerciseData)return 'Détails de l’exercice';
   return 'Détails du minuteur';
 }
@@ -3785,17 +4443,23 @@ function updateTimerDetails(){
   const effortEl=document.getElementById('tip-effort');
   const restEl=document.getElementById('tip-rest');
   const modeEl=document.getElementById('tip-mode');
+  const effortInfo=document.getElementById('tip-effort-info');
+  const restInfo=document.getElementById('tip-rest-info');
+  const modeInfo=document.getElementById('tip-mode-info');
 
   if(!target||!sets||!how||!tips)return;
 
   if(!ex){
     target.textContent='—';
     sets.textContent='—';
-    how.textContent='Lance une séance depuis Aujourd’hui ou un exercice depuis Exercices pour voir les détails ici.';
+    how.textContent=isManualTimerMode()?'Choisis une durée, puis lance ton minuteur libre.':'Lance une séance depuis Aujourd’hui ou un exercice depuis Exercices pour voir les détails ici.';
     tips.textContent='';
     if(effortEl)effortEl.textContent=timer.seconds?fmt(timer.seconds):'—';
     if(restEl)restEl.textContent=timer.rest?fmt(timer.rest):'Aucune';
-    if(modeEl)modeEl.textContent=timerModeLabel();
+    if(modeEl)modeEl.textContent=isManualTimerMode()?'Manuel':timerModeLabel();
+    if(effortInfo)effortInfo.textContent=isManualTimerMode()?'Durée libre choisie pour ton chrono manuel.':'Aucun exercice lancé pour le moment.';
+    if(restInfo)restInfo.textContent=isManualTimerMode()?'Repos indicatif si tu veux enchaîner plusieurs tours.':'La récupération apparaîtra quand un exercice sera sélectionné.';
+    if(modeInfo)modeInfo.textContent=isManualTimerMode()?'Le minuteur manuel ne valide pas un exercice automatiquement.':'Le mode suit ton profil actuel.';
     return;
   }
 
@@ -3817,6 +4481,9 @@ function updateTimerDetails(){
   if(effortEl)effortEl.textContent=effort ? fmt(effort) : 'Libre';
   if(restEl)restEl.textContent=rest ? fmt(rest) : 'Aucune';
   if(modeEl)modeEl.textContent=timerModeLabel();
+  if(effortInfo)effortInfo.textContent=currentStep?'Durée de cette étape du circuit.':'Durée prévue pour une série propre, sans précipiter le mouvement.';
+  if(restInfo)restInfo.textContent=rest?'Récupération avant la suite. Garde une respiration calme et repars propre.':'Pas de repos programmé pour ce bloc.';
+  if(modeInfo)modeInfo.textContent='Ce mode adapte les exercices, les durées et la récupération à ton profil.';
 
   const detail=document.getElementById('timer-detail-card');
   let old=document.getElementById('timer-circuit-next');
@@ -3969,6 +4636,7 @@ function updateMainTimerButton(){
     const showRestart=!timer.running && canRestartTimer() && (hasActiveTimerSession() || timer.left===0);
     restartBtn.classList.toggle('hidden',!showRestart);
   }
+  syncImmersiveTimer();
 }
 
 function updateTimer(){syncTimerLabels();updateMainTimerButton();updateTimerValidateButton();
@@ -4011,25 +4679,35 @@ display.classList.toggle('running',timer.running);
   const mainTimerBtn=document.getElementById('main-timer-btn');
   if(mainTimerBtn)mainTimerBtn.classList.toggle('running',timer.running);
   if(mainTimerBtn)mainTimerBtn.classList.toggle('paused',!timer.running&&hasActiveTimerSession());
+  syncImmersiveTimer();
   syncTimerButtons();
 }
 
 function startPrepCountdown(){
   clearInterval(timer.interval);
+  const resumePrep=timer.pendingStart && timer.phase==='prep';
+  const originalLeft=resumePrep ? (timer.prepOriginalLeft || timer.seconds || timer.left) : timer.left;
+  const originalTotal=resumePrep ? (timer.prepOriginalTotal || timer.totalPhase || timer.seconds || timer.left) : (timer.totalPhase || timer.seconds || timer.left);
+  const returnPhase=resumePrep ? (timer.prepReturnPhase || 'effort') : (timer.phase || 'effort');
+  let prepLeft=resumePrep ? timer.left : timer.prep;
+
   timer.pendingStart=true;
   timer.running=true;
+  timer.phase='prep';
+  timer.prepOriginalLeft=originalLeft;
+  timer.prepOriginalTotal=originalTotal;
+  timer.prepReturnPhase=returnPhase;
+  timer.left=prepLeft;
+  timer.totalPhase=Math.max(1,timer.prep);
   updateMainTimerButton();
-  const originalLeft=timer.left;
-  let prepLeft=timer.prep;
   document.getElementById('timer-phase').textContent='PRÉPARATION';
   syncTimerLabels();
-  document.getElementById('timer-display').textContent=fmt(prepLeft);
-  const ring=document.getElementById('timer-ring');
-  if(ring)ring.style.setProperty('--timer-progress','0%');
+  updateTimer();
   cue('count');
 
   timer.interval=setInterval(()=>{
     prepLeft--;
+    timer.left=Math.max(0,prepLeft);
     const progress=Math.round(((timer.prep-prepLeft)/Math.max(1,timer.prep))*100);
     const ring=document.getElementById('timer-ring');
     const fill=document.getElementById('timer-linear-fill');
@@ -4042,12 +4720,18 @@ function startPrepCountdown(){
     if(step)step.textContent='Décompte';
 
     if(prepLeft>0){
-      document.getElementById('timer-display').textContent=fmt(prepLeft);
       if(prepLeft<=3)cue('count');
+      updateTimer();
     }else{
       clearInterval(timer.interval);
-      timer.pendingStart=false;syncTimerLabels();
+      timer.pendingStart=false;
+      timer.phase=timer.prepReturnPhase || 'effort';
       timer.left=originalLeft;
+      timer.totalPhase=originalTotal;
+      delete timer.prepOriginalLeft;
+      delete timer.prepOriginalTotal;
+      delete timer.prepReturnPhase;
+      syncTimerLabels();
       document.getElementById('timer-phase').textContent='EFFORT';
       startActiveTimer();
     }
