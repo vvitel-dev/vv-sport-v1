@@ -9,6 +9,7 @@
 <meta name="format-detection" content="telephone=no">
 <title>vV Sport</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -123,6 +124,7 @@
       <button class="start-btn" id="main-timer-btn" type="button" onclick="toggleTimer()">Commencer</button>
       <button class="timer-secondary-btn hidden" id="timer-restart-btn" type="button" onclick="restartCurrentTimer()">Recommencer</button>
       <button class="timer-validate-btn hidden" id="timer-validate-btn" type="button" onclick="validateTimerExercise()">Valider cet exercice</button>
+      <div class="timer-finish-panel hidden" id="timer-finish-panel"></div>
       <div class="preset-grid">
         <button class="preset-btn" type="button" onclick="setManualTimer(45)">45s</button><button class="preset-btn" type="button" onclick="setManualTimer(60)">60s</button><button class="preset-btn" type="button" onclick="setManualTimer(90)">90s</button><button class="preset-btn" type="button" onclick="setManualTimer(120)">2min</button>
         <button class="preset-btn" type="button" onclick="setManualTimer(150)">2:30</button><button class="preset-btn" type="button" onclick="setManualTimer(180)">3min</button><button class="preset-btn" type="button" onclick="setManualTimer(240)">4min</button><button class="preset-btn" type="button" onclick="setManualTimer(300)">5min</button>
@@ -208,15 +210,19 @@
 
 <div id="immersive-timer" class="immersive-timer hidden" hidden>
   <button class="immersive-close" type="button" onclick="closeImmersiveTimer()" aria-label="Fermer le mode immersif">×</button>
-  <div class="immersive-kicker" id="immersive-status">Prêt</div>
-  <div class="immersive-title" id="immersive-title">Minuteur</div>
-  <div class="immersive-subtitle" id="immersive-subtitle">Exercice sélectionné</div>
-  <div class="immersive-ring" id="immersive-ring">
-    <div class="immersive-time" id="immersive-time">01:30</div>
+  <div class="immersive-top">
+    <div class="immersive-kicker" id="immersive-status">Prêt</div>
+    <div class="immersive-title" id="immersive-title">Minuteur</div>
+    <div class="immersive-subtitle" id="immersive-subtitle">Exercice sélectionné</div>
   </div>
-  <div class="immersive-meta">
-    <span id="immersive-step">En attente</span>
-    <strong id="immersive-percent">0%</strong>
+  <div class="immersive-center">
+    <div class="immersive-ring" id="immersive-ring">
+      <div class="immersive-time" id="immersive-time">01:30</div>
+    </div>
+    <div class="immersive-phase-card">
+      <span id="immersive-step">En attente</span>
+      <strong id="immersive-percent">0%</strong>
+    </div>
   </div>
   <div class="immersive-bar"><div id="immersive-fill"></div></div>
   <div class="immersive-actions">

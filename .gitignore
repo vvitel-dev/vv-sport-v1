@@ -18,6 +18,7 @@ dist/
 build/
 .cache/
 build.js
+*.min
 
 # Local environment files
 .env
