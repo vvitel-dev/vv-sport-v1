@@ -4048,10 +4048,6 @@ function renderHeaderNavControls(){
 }
 
 function renderMediaControls(){
-  const container=document.getElementById('media-controls');
-  if(!container)return;
-  container.innerHTML='<button class="header-media-btn timer-youtube-btn" id="timer-youtube-btn" type="button" onclick="openYouTubeMusic()" title="Ajouter un lien YouTube" aria-label="Ajouter un lien YouTube"><svg class="media-service-icon youtube-service-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="18" height="11" rx="3"></rect><path d="M10.5 9.5v5l4.4-2.5z"></path></svg></button>'+
-    '<button class="header-media-btn timer-spotify-btn" id="timer-spotify-btn" type="button" onclick="openSpotifyMusic()" title="Ajouter un lien Spotify" aria-label="Ajouter un lien Spotify"><svg class="media-service-icon spotify-service-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7.2 9.5c3.2-1 7.1-.7 9.7.8"></path><path d="M7.8 12.2c2.6-.8 5.7-.6 7.9.6"></path><path d="M8.5 14.8c1.9-.5 4.1-.4 5.7.5"></path></svg></button>';
   updateSpotifyUI();
   updateYouTubeUI();
 }

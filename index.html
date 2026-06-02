@@ -191,15 +191,18 @@
   <div id="options-content"></div>
 </section>
 
-<!-- Media controls (YouTube & Spotify) - kept separate from main tab bar -->
-<div id="media-controls" class="media-controls"></div>
-
 <nav class="tab-bar" aria-label="Navigation principale">
     <button class="tab-btn active" id="tbtn-program" data-tab="program" type="button" aria-controls="tab-program" aria-current="page">Programme</button>
     <button class="tab-btn" id="tbtn-exercises" data-tab="exercises" type="button" aria-controls="tab-exercises">Exercices</button>
     <button class="tab-btn" id="tbtn-timer" data-tab="timer" type="button" aria-controls="tab-timer">Minuteur</button>
     <button class="tab-btn" id="tbtn-stats" data-tab="stats" type="button" aria-controls="tab-stats">Stats</button>
-    <button class="tab-btn" id="tbtn-options" data-tab="options" type="button" aria-controls="tab-options">Options</button>
+    <div class="options-dropdown-wrapper">
+      <button class="tab-btn" id="tbtn-options" data-tab="options" type="button" aria-controls="tab-options" aria-expanded="false">Options</button>
+      <div class="options-dropdown-menu" id="options-dropdown-menu">
+        <button class="dropdown-item media-btn timer-youtube-btn" id="timer-youtube-btn" type="button" onclick="openYouTubeMusic()" title="Ajouter un lien YouTube" aria-label="Ajouter un lien YouTube"><svg class="media-service-icon youtube-service-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="18" height="11" rx="3"></rect><path d="M10.5 9.5v5l4.4-2.5z"></path></svg><span>YouTube</span></button>
+        <button class="dropdown-item media-btn timer-spotify-btn" id="timer-spotify-btn" type="button" onclick="openSpotifyMusic()" title="Ajouter un lien Spotify" aria-label="Ajouter un lien Spotify"><svg class="media-service-icon spotify-service-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7.2 9.5c3.2-1 7.1-.7 9.7.8"></path><path d="M7.8 12.2c2.6-.8 5.7-.6 7.9.6"></path><path d="M8.5 14.8c1.9-.5 4.1-.4 5.7.5"></path></svg><span>Spotify</span></button>
+      </div>
+    </div>
   </nav>
 </main>
 
