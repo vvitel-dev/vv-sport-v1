@@ -93,10 +93,6 @@
         <button id="timer-mode-exercise" class="timer-mode-btn active" type="button" onclick="activateExerciseTimerMode()">Exercice</button>
         <button id="timer-mode-manual" class="timer-mode-btn" type="button" onclick="activateManualTimerMode()">Manuel</button>
       </div>
-      <div class="timer-media-row">
-        <button class="timer-spotify-btn" id="timer-spotify-btn" type="button" onclick="openSpotifyMusic()">Ajouter musique</button>
-        <button class="timer-spotify-btn timer-youtube-btn" id="timer-youtube-btn" type="button" onclick="openYouTubeMusic()">Ajouter YouTube</button>
-      </div>
       <div class="timer-detail-card" id="timer-detail-card">
         <div class="timer-detail-row"><span>Cible</span><strong id="timer-target">—</strong></div>
         <div class="timer-detail-row"><span>Séries</span><strong id="timer-sets">—</strong></div>
@@ -132,7 +128,7 @@
         <button class="preset-btn" type="button" onclick="setManualTimer(150)">2:30</button><button class="preset-btn" type="button" onclick="setManualTimer(180)">3min</button><button class="preset-btn" type="button" onclick="setManualTimer(240)">4min</button><button class="preset-btn" type="button" onclick="setManualTimer(300)">5min</button>
       </div>
     </div>
-    <details class="timer-summary-details">
+    <details class="timer-summary-details" open>
       <summary class="section-label timer-summary-toggle" id="timer-detail-title">Détails de l’exercice</summary>
       <div class="tip-card timer-summary-card">
         <details class="tip-row tip-expand"><summary><span>Effort</span><span id="tip-effort">—</span></summary><p id="tip-effort-info">Durée du bloc en cours.</p></details>

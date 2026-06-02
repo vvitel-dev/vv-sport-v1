@@ -200,7 +200,7 @@ function updateYouTubeMiniButton(show){
     mini.id='youtube-mini-btn';
     mini.className='spotify-mini-btn youtube-mini-btn hidden';
     mini.type='button';
-    mini.innerHTML='<span aria-hidden="true">▶</span>';
+    mini.innerHTML='<svg class="media-service-icon youtube-service-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="18" height="11" rx="3"></rect><path d="M10.5 9.5v5l4.4-2.5z"></path></svg>';
     mini.setAttribute('aria-label','Réouvrir YouTube');
     mini.title='Réouvrir YouTube';
     mini.onclick=restoreYouTubePlayer;
@@ -238,7 +238,7 @@ function updateSpotifyMiniButton(show){
     mini.id='spotify-mini-btn';
     mini.className='spotify-mini-btn hidden';
     mini.type='button';
-    mini.innerHTML='<span aria-hidden="true">♪</span>';
+    mini.innerHTML='<svg class="media-service-icon spotify-service-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7.2 9.5c3.2-1 7.1-.7 9.7.8"></path><path d="M7.8 12.2c2.6-.8 5.7-.6 7.9.6"></path><path d="M8.5 14.8c1.9-.5 4.1-.4 5.7.5"></path></svg>';
     mini.setAttribute('aria-label','Réouvrir Spotify');
     mini.title='Réouvrir Spotify';
     mini.onclick=restoreSpotifyPlayer;
@@ -293,6 +293,10 @@ function makePlayerDraggable(sheet,handleSelector){
   handle.addEventListener('pointerdown',event=>{
     if(event.target&&event.target.closest&&event.target.closest('button'))return;
     dragging=true;
+    if(sheet.id==='media-floating-dock'){
+      storageSafe.removeItem('vv-media-dock-anchor');
+      sheet.classList.remove('attached');
+    }
     startX=event.clientX;
     startY=event.clientY;
     const rect=sheet.getBoundingClientRect();
@@ -301,15 +305,18 @@ function makePlayerDraggable(sheet,handleSelector){
     handle.setPointerCapture&&handle.setPointerCapture(event.pointerId);
   });
   handle.addEventListener('pointermove',event=>move(event.clientX,event.clientY));
-  handle.addEventListener('pointerup',()=>{dragging=false;});
+  handle.addEventListener('pointerup',()=>{
+    dragging=false;
+    if(sheet.id==='media-floating-dock')setTimeout(()=>snapMediaDockToNearestBlock(sheet),0);
+  });
   handle.addEventListener('pointercancel',()=>{dragging=false;});
 }
 function updateSpotifyUI(){
+  removeLegacyMediaDock();
   const has=!!cleanSpotifyUrl(spotifyUrl);
   const btn=document.getElementById('timer-spotify-btn');
   if(btn){
     btn.classList.toggle('connected',has);
-    btn.textContent=has?'Musique':'Ajouter musique';
     btn.title=has?'Ouvrir Spotify':'Ajouter un lien Spotify';
     btn.setAttribute('aria-label',btn.title);
   }
@@ -322,11 +329,11 @@ function updateSpotifyUI(){
   }
 }
 function updateYouTubeUI(){
+  removeLegacyMediaDock();
   const has=!!youtubeEmbedUrl(youtubeUrl);
   const btn=document.getElementById('timer-youtube-btn');
   if(btn){
     btn.classList.toggle('connected',has);
-    btn.textContent=has?'YouTube':'Ajouter YouTube';
     btn.title=has?'Ouvrir YouTube':'Ajouter un lien YouTube';
     btn.setAttribute('aria-label',btn.title);
   }
@@ -337,6 +344,105 @@ function updateYouTubeUI(){
     openBtn.classList.toggle('connected',has);
     openBtn.textContent=has?'Ouvrir YouTube':'Ajouter un lien';
   }
+}
+function removeLegacyMediaDock(){
+  const dock=document.getElementById('media-floating-dock');
+  if(dock)dock.remove();
+  storageSafe.removeItem('vv-media-dock-anchor');
+}
+function ensureMediaDock(){
+  removeLegacyMediaDock();
+  return null;
+}
+function mediaDockCandidateSelectors(){
+  return ['#timer-ring','.timer-summary-details','.timer-card','.session-runner-card','.program-hero','.custom-session-builder','.exercise-theme-section[open]','.exercise-theme-section','.options-section','.stat-card','.tab-bar'];
+}
+function visibleMediaDockBlocks(){
+  const blocks=[];
+  mediaDockCandidateSelectors().forEach(selector=>{
+    document.querySelectorAll(selector).forEach((el,index)=>{
+      const rect=el.getBoundingClientRect();
+      if(rect.width<40||rect.height<30)return;
+      if(rect.bottom<0||rect.top>window.innerHeight)return;
+      blocks.push({el,selector,index,rect});
+    });
+  });
+  return blocks;
+}
+function clampMediaDockPosition(dock,left,top){
+  const maxLeft=Math.max(8,window.innerWidth-dock.offsetWidth-8);
+  const maxTop=Math.max(8,window.innerHeight-dock.offsetHeight-8);
+  return {
+    left:Math.max(8,Math.min(maxLeft,left)),
+    top:Math.max(8,Math.min(maxTop,top))
+  };
+}
+function placeMediaDockAt(dock,left,top){
+  const pos=clampMediaDockPosition(dock,left,top);
+  dock.style.left=pos.left+'px';
+  dock.style.top=pos.top+'px';
+  dock.style.right='auto';
+  dock.style.bottom='auto';
+  dock.style.margin='0';
+}
+function placeMediaDockAnchor(dock,anchor){
+  const all=Array.from(document.querySelectorAll(anchor.selector));
+  const el=all[anchor.index]||all[0];
+  if(!el)return false;
+  const rect=el.getBoundingClientRect();
+  const gap=anchor.selector==='#timer-ring'?14:8;
+  const y=rect.top+(rect.height*(anchor.yRatio??0.5))-(dock.offsetHeight/2);
+  let x=anchor.side==='left' ? rect.left-dock.offsetWidth-gap : rect.right+gap;
+  if(x<8)x=rect.left+gap;
+  if(x+dock.offsetWidth>window.innerWidth-8)x=rect.right-dock.offsetWidth-gap;
+  placeMediaDockAt(dock,x,y);
+  dock.classList.add('attached');
+  return true;
+}
+function snapMediaDockToNearestBlock(dock=document.getElementById('media-floating-dock')){
+  if(!dock)return;
+  const dockRect=dock.getBoundingClientRect();
+  const dockCenter={x:dockRect.left+dockRect.width/2,y:dockRect.top+dockRect.height/2};
+  const blocks=visibleMediaDockBlocks();
+  if(!blocks.length){
+    storageSafe.removeItem('vv-media-dock-anchor');
+    dock.classList.remove('attached');
+    return;
+  }
+  let best=null;
+  blocks.forEach(block=>{
+    const r=block.rect;
+    const cx=Math.max(r.left,Math.min(r.right,dockCenter.x));
+    const cy=Math.max(r.top,Math.min(r.bottom,dockCenter.y));
+    const dist=Math.hypot(dockCenter.x-cx,dockCenter.y-cy);
+    if(!best||dist<best.dist)best={...block,dist};
+  });
+  if(!best)return;
+  if(best.dist>34){
+    storageSafe.removeItem('vv-media-dock-anchor');
+    dock.classList.remove('attached');
+    return;
+  }
+  const side=dockCenter.x < best.rect.left+(best.rect.width/2) ? 'left' : 'right';
+  const yRatio=Math.max(0,Math.min(1,(dockCenter.y-best.rect.top)/Math.max(1,best.rect.height)));
+  const anchor={selector:best.selector,index:best.index,side,yRatio};
+  storageSafe.setItem('vv-media-dock-anchor',JSON.stringify(anchor));
+  placeMediaDockAnchor(dock,anchor);
+}
+function restoreMediaDockAnchor(dock=document.getElementById('media-floating-dock')){
+  if(!dock)return;
+  try{
+    const anchor=JSON.parse(storageSafe.getItem('vv-media-dock-anchor')||'null');
+    if(anchor&&anchor.selector)placeMediaDockAnchor(dock,anchor);
+    else placeMediaDockAnchor(dock,{selector:'#timer-ring',index:0,side:'left',yRatio:0.5});
+  }catch(e){}
+}
+function initMediaDockMagnet(dock){
+  if(!dock||dock.dataset.magnet==='1')return;
+  dock.dataset.magnet='1';
+  setTimeout(()=>restoreMediaDockAnchor(dock),0);
+  window.addEventListener('resize',()=>restoreMediaDockAnchor(dock));
+  document.addEventListener('scroll',()=>restoreMediaDockAnchor(dock),{passive:true});
 }
 const COLOR_THEMES={
   lime:{label:'Lime',accent:'#bdf45b',dim:'rgba(189,244,91,.10)',accent2:'#74d7e7',accent3:'#e9bd65',bg:'#0b0d0c',gradient:'linear-gradient(135deg,#d9ff63 0%,#9be84a 48%,#67e8f9 100%)'},
@@ -401,6 +507,10 @@ function renderTimerColorPreset(){
     ring.appendChild(tools);
   }else if(tools.parentElement!==ring){
     ring.appendChild(tools);
+  }
+  tools.querySelectorAll('.timer-spotify-btn,.timer-youtube-btn').forEach(btn=>btn.remove());
+  if(!tools.querySelector('[onclick="openImmersiveTimer()"]')){
+    tools.insertAdjacentHTML('afterbegin','<button class="timer-icon-btn" type="button" onclick="openImmersiveTimer()" title="Mode immersif" aria-label="Ouvrir le mode immersif"><span aria-hidden="true">⛶</span></button>');
   }
   let box=document.getElementById('timer-color-preset');
   if(!box){
@@ -3892,6 +4002,7 @@ function navigateTab(delta){
 
 function renderHeaderNavControls(){
   document.querySelectorAll('.page-nav-controls').forEach(el=>el.remove());
+  document.querySelectorAll('.header-media-controls').forEach(el=>el.remove());
   const names=getTabPageNames();
   if(!currentTab || !names.includes(currentTab))return;
   const page=document.getElementById('tab-'+currentTab);
@@ -3906,8 +4017,12 @@ function renderHeaderNavControls(){
   controls.className='page-nav-controls';
   controls.innerHTML=
     '<button class="page-nav-btn" type="button" onclick="navigateTab(-1)" aria-label="Page précédente : '+escapeHTML(TAB_LABELS[prev]||prev)+'">‹</button>'+
-    '<button class="page-nav-btn" type="button" onclick="navigateTab(1)" aria-label="Page suivante : '+escapeHTML(TAB_LABELS[next]||next)+'">›</button>';
+    '<button class="page-nav-btn" type="button" onclick="navigateTab(1)" aria-label="Page suivante : '+escapeHTML(TAB_LABELS[next]||next)+'">›</button>'+
+    '<button class="header-media-btn timer-youtube-btn" id="timer-youtube-btn" type="button" onclick="openYouTubeMusic()" title="Ajouter un lien YouTube" aria-label="Ajouter un lien YouTube"><svg class="media-service-icon youtube-service-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="18" height="11" rx="3"></rect><path d="M10.5 9.5v5l4.4-2.5z"></path></svg></button>'+
+    '<button class="header-media-btn timer-spotify-btn" id="timer-spotify-btn" type="button" onclick="openSpotifyMusic()" title="Ajouter un lien Spotify" aria-label="Ajouter un lien Spotify"><svg class="media-service-icon spotify-service-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7.2 9.5c3.2-1 7.1-.7 9.7.8"></path><path d="M7.8 12.2c2.6-.8 5.7-.6 7.9.6"></path><path d="M8.5 14.8c1.9-.5 4.1-.4 5.7.5"></path></svg></button>';
   header.appendChild(controls);
+  updateSpotifyUI();
+  updateYouTubeUI();
 }
 
 function normalizeTabTarget(t){
