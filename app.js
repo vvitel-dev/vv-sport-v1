@@ -2270,7 +2270,7 @@ function initIntroScreen(){
   }
   setTimeout(hideIntroScreen,1700);
 }
-function saveProfileAndEnter(targetTab='program'){
+function saveProfileAndEnter(targetTab='plan'){
   if(!profile.level){
     alert('Choisis ton niveau et le matériel disponible');
     return;
@@ -2740,7 +2740,7 @@ function startFreshFromLaunch(){
     storageSafe.setItem('vv-current-day',currentDay);
     document.getElementById('app-screen').classList.remove('hidden');
     renderAll();
-    showTab('today');
+    showTab('plan');
   }else{
     document.getElementById('setup-screen').classList.remove('hidden');
     renderChoices();
@@ -3975,9 +3975,8 @@ const WEEKLY_PLAN_KEY='vv-weekly-plan-v1';
 const SAVED_WEEKLY_PLANS_KEY='vv-saved-weekly-plans-v1';
 const WEEKLY_PLAN_TYPES={
   rest:'Repos',
-  routine:'Routine',
-  session:'Séance',
-  exercise:'Exercice libre'
+  routine:'Exercice libre',
+  session:'Séance'
 };
 let weeklyPlanEditing=false;
 let weeklyPlan=loadWeeklyPlan();
@@ -4017,10 +4016,21 @@ function normalizeWeeklyPlan(plan){
   next.sportDays=Math.max(1,Math.min(6,Number(next.sportDays)||DAYS.filter(day=>next.days[day]&&next.days[day].type!=='rest').length||3));
   DAYS.forEach(day=>{
     next.days[day]={type:'routine',routineDay:day,sessionId:'',exerciseKey:'',customName:'',customKeys:[],customExerciseNames:{},...(next.days[day]||{})};
+    if(next.days[day].type==='exercise'){
+      next.days[day].type='routine';
+      if(next.days[day].exerciseKey){
+        const keys=Array.isArray(next.days[day].customKeys)?next.days[day].customKeys:[];
+        if(!keys.includes(next.days[day].exerciseKey))keys.push(next.days[day].exerciseKey);
+        next.days[day].customKeys=keys;
+      }
+    }
     if(!WEEKLY_PLAN_TYPES[next.days[day].type])next.days[day].type='routine';
     if(!DAYS.includes(next.days[day].routineDay))next.days[day].routineDay=day;
     if(!Array.isArray(next.days[day].customKeys))next.days[day].customKeys=[];
     if(!next.days[day].customExerciseNames||typeof next.days[day].customExerciseNames!=='object')next.days[day].customExerciseNames={};
+    if(/^Routine\b/i.test(String(next.days[day].customName||''))){
+      next.days[day].customName=String(next.days[day].customName).replace(/^Routine\b/i,'Exercice libre');
+    }
   });
   return next;
 }
@@ -4106,7 +4116,7 @@ function weeklyPlanCustomItems(day,entry=weeklyPlanEntry(day)){
 }
 
 function weeklyPlanCustomRoutineName(day,entry=weeklyPlanEntry(day)){
-  return (entry&&entry.customName&&entry.customName.trim()) || ('Routine '+day);
+  return (entry&&entry.customName&&entry.customName.trim()) || ('Exercice libre '+day);
 }
 
 function weeklyPlanCustomRoutineSteps(day,entry=weeklyPlanEntry(day)){
@@ -4153,7 +4163,7 @@ function weeklyPlanSportTypeOptions(selectedType){
 
 function weeklyPlanRoutineOptions(selectedDay){
   return DAYS.map(day=>
-    '<option value="'+day+'" '+(day===selectedDay?'selected':'')+'>'+day+' - '+escapeHTML((P()[day]&&P()[day].title)||'Routine')+'</option>'
+    '<option value="'+day+'" '+(day===selectedDay?'selected':'')+'>'+day+' - '+escapeHTML((P()[day]&&P()[day].title)||'Programme')+'</option>'
   ).join('');
 }
 
@@ -4226,7 +4236,7 @@ function weeklyPlanSummary(day,entry){
     if(customItems.length)return weeklyPlanCustomRoutineName(day,entry)+' · '+customItems.length+' exo'+(customItems.length>1?'s':'');
     const source=entry.routineDay||day;
     const p=P()[source];
-    return 'Routine '+source+' · '+(p&&p.title?p.title:'programme');
+    return 'Exercice libre '+source+' · '+(p&&p.title?p.title:'programme');
   }
   if(entry.type==='session'){
     const session=savedCustomSessions.find((s,index)=>(s.id||String(index))===entry.sessionId);
@@ -4246,9 +4256,7 @@ function weeklyPlanEditFields(day,entry){
     ? '<label>Base programme<select data-action="plan-field" data-day="'+day+'" data-field="routineDay">'+weeklyPlanRoutineOptions(entry.routineDay||day)+'</select></label>'+weeklyPlanRoutineBuilderHTML(day,entry)
     : (type==='session'
       ? '<label>Séance sauvegardée<select data-action="plan-field" data-day="'+day+'" data-field="sessionId">'+weeklyPlanSessionOptions(entry.sessionId)+'</select></label>'+createSessionLink
-      : (type==='exercise'
-        ? '<label>Exercice de la bibliothèque<select data-action="plan-field" data-day="'+day+'" data-field="exerciseKey">'+weeklyPlanExerciseOptions(entry.exerciseKey)+'</select></label>'
-        : '<div class="plan-rest-note">Repos actif ou vraie coupure. Rien ne sera compté dans les exercices.</div>'));
+      : '<div class="plan-rest-note">Repos actif ou vraie coupure. Rien ne sera compté dans les exercices.</div>');
   return '<div class="plan-edit-grid">'+
     '<label>Quoi faire ce jour<select data-action="plan-field" data-day="'+day+'" data-field="type">'+weeklyPlanTypeOptions(type)+'</select></label>'+
     detail+
@@ -4271,7 +4279,7 @@ function weeklyPlanRoutineBuilderHTML(day,entry){
           '</div>'+
         '</div>'
       ).join('')+'</div>'
-    : '<div class="plan-routine-empty">Ajoute des exercices pour créer une routine propre à ce jour. Sinon la base programme sera utilisée.</div>';
+    : '<div class="plan-routine-empty">Ajoute des exercices pour créer ta séance libre du jour. Sinon la base programme sera utilisée.</div>';
   const shopHTML=EXERCISE_THEME_ORDER.map(theme=>{
     const group=items.filter(item=>item.theme===theme);
     if(!group.length)return '';
@@ -4288,8 +4296,8 @@ function weeklyPlanRoutineBuilderHTML(day,entry){
     '</details>';
   }).join('');
   return '<div class="plan-routine-builder">'+
-    '<label>Nom de la routine<input type="text" maxlength="36" value="'+escapeHTML(weeklyPlanCustomRoutineName(day,entry))+'" data-action="plan-routine-field" data-day="'+day+'" data-field="customName"></label>'+
-    '<div class="plan-routine-head"><span>Routine du jour</span><strong>'+selected.length+' exercice'+(selected.length>1?'s':'')+'</strong></div>'+
+    '<label>Nom de la séance libre<input type="text" maxlength="36" value="'+escapeHTML(weeklyPlanCustomRoutineName(day,entry))+'" data-action="plan-routine-field" data-day="'+day+'" data-field="customName"></label>'+
+    '<div class="plan-routine-head"><span>Exercice libre</span><strong>'+selected.length+' exercice'+(selected.length>1?'s':'')+'</strong></div>'+
     selectedHTML+
     '<details class="plan-routine-shop">'+
       '<summary><span>Ajouter des exercices</span><strong>Boutique</strong></summary>'+
@@ -4323,12 +4331,12 @@ function renderWeeklyPlan(){
       '<div class="plan-calendar-event"><b>'+escapeHTML(title)+'</b><small>'+summary+'</small></div>'+
       '<div class="plan-calendar-meta">'+(minutes?'~'+minutes+' min':'Repos')+'</div>';
     if(weeklyPlanEditing){
-      return '<details class="plan-calendar-day plan-calendar-drop '+(active?'active':'rest')+' '+(day===today?'today':'')+'">'+
+      return '<details class="plan-calendar-day plan-calendar-drop '+(active?'active':'rest')+' '+(day===today?'today':'')+'" data-plan-day="'+day+'">'+
         '<summary class="plan-calendar-summary">'+head+'</summary>'+
         '<div class="plan-calendar-edit">'+weeklyPlanEditFields(day,entry)+'</div>'+
       '</details>';
     }
-    return '<article class="plan-calendar-day '+(active?'active':'rest')+' '+(day===today?'today':'')+'">'+head+'</article>';
+    return '<article class="plan-calendar-day '+(active?'active':'rest')+' '+(day===today?'today':'')+'" data-plan-day="'+day+'">'+head+'</article>';
   }).join('');
   const editPanel=weeklyPlanEditing
     ? '<div class="plan-editor-panel">'+
@@ -4445,6 +4453,7 @@ function updateWeeklyPlanDraft(day,field,value){
     return;
   }
   if(!DAYS.includes(day))return;
+  const shouldKeepDayOpen=field==='type'||field==='routineDay'||field==='sessionId'||field==='exerciseKey';
   weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
   const entry=weeklyPlan.days[day];
   if(field==='duplicateFrom'){
@@ -4466,8 +4475,38 @@ function updateWeeklyPlanDraft(day,field,value){
     }
   }
   saveWeeklyPlan();
-  renderWeeklyPlan();
+  if(shouldKeepDayOpen)syncWeeklyPlanDayCard(day);
+  else renderWeeklyPlan();
   renderSetupPlan();
+}
+
+function syncWeeklyPlanDayCard(day){
+  const card=document.querySelector('.plan-calendar-day[data-plan-day="'+day+'"]');
+  if(!card){
+    renderWeeklyPlan();
+    return;
+  }
+  const entry=weeklyPlanEntry(day);
+  const active=entry.type!=='rest';
+  const minutes=weeklyPlanEntryMinutes(day,entry);
+  card.classList.toggle('active',active);
+  card.classList.toggle('rest',!active);
+  const titleEl=card.querySelector('.plan-calendar-event b');
+  if(titleEl)titleEl.textContent=active ? (WEEKLY_PLAN_TYPES[entry.type]||'Sport') : 'Repos';
+  const summary=card.querySelector('.plan-calendar-event small');
+  if(summary){
+    summary.textContent=entry.type==='rest'
+      ? 'Journée libre'
+      : (entry.type==='routine'
+        ? (weeklyPlanCustomItems(day,entry).length
+          ? weeklyPlanSummary(day,entry)
+          : (((P()[entry.routineDay||day]||{}).title)||'Programme'))
+        : weeklyPlanSummary(day,entry).replace(/^Séance sauvegardée · /,''));
+  }
+  const meta=card.querySelector('.plan-calendar-meta');
+  if(meta)meta.textContent=minutes?'~'+minutes+' min':'Repos';
+  const edit=card.querySelector('.plan-calendar-edit');
+  if(edit)edit.innerHTML=weeklyPlanEditFields(day,entry);
 }
 
 function updateWeeklyPlanRoutineField(day,field,value,options={}){
@@ -4506,8 +4545,31 @@ function addWeeklyPlanRoutineExercise(day,libraryIndex){
   entry.customExerciseNames={...(entry.customExerciseNames||{})};
   if(!entry.customExerciseNames[key])entry.customExerciseNames[key]=item.ex.name;
   saveWeeklyPlan();
-  renderWeeklyPlan();
+  syncWeeklyPlanDayCard(day);
   renderSetupPlan();
+}
+
+function syncWeeklyPlanRoutineBuilder(day){
+  const card=document.querySelector('.plan-calendar-day[data-plan-day="'+day+'"]');
+  if(!card){
+    renderWeeklyPlan();
+    return;
+  }
+  const entry=weeklyPlanEntry(day);
+  const builder=card.querySelector('.plan-routine-builder');
+  if(builder)builder.outerHTML=weeklyPlanRoutineBuilderHTML(day,entry);
+  const summary=card.querySelector('.plan-calendar-event small');
+  if(summary){
+    const customItems=weeklyPlanCustomItems(day,entry);
+    summary.textContent=customItems.length
+      ? weeklyPlanCustomRoutineName(day,entry)+' · '+customItems.length+' exo'+(customItems.length>1?'s':'')
+      : (((P()[entry.routineDay||day]||{}).title)||'Programme');
+  }
+  const meta=card.querySelector('.plan-calendar-meta');
+  if(meta){
+    const minutes=weeklyPlanEntryMinutes(day,entry);
+    meta.textContent=minutes?'~'+minutes+' min':'Repos';
+  }
 }
 
 function removeWeeklyPlanRoutineExercise(day,index){

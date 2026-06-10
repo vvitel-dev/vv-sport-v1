@@ -5747,6 +5747,12 @@ body.immersive-open .app-header{
     linear-gradient(135deg,color-mix(in srgb,var(--timer-color,var(--accent)) 34%,rgba(255,255,255,.05)),rgba(255,255,255,.035)),
     conic-gradient(from -90deg,color-mix(in srgb,var(--timer-color,var(--accent)) 92%,#fff) 0 var(--timer-progress,0%),rgba(255,255,255,.07) var(--timer-progress,0%) 100%)!important;
 }
+.immersive-timer.skin-chrono .immersive-center::before,
+.immersive-timer.skin-chrono .immersive-center::after{
+  opacity:0!important;
+  animation:none!important;
+  background:transparent!important;
+}
 .immersive-timer.skin-chrono .immersive-ring::before{
   inset:18px!important;
   border-radius:24px!important;
@@ -5782,4 +5788,309 @@ body.immersive-open .app-header{
 @keyframes immersiveTimeBeat{
   0%,100%{text-shadow:0 0 18px color-mix(in srgb,var(--timer-color,var(--accent)) 22%,transparent);transform:scale(1)}
   50%{text-shadow:0 0 30px color-mix(in srgb,var(--timer-color,var(--accent)) 48%,transparent);transform:scale(1.012)}
+}
+
+/* Modern refresh */
+:root{
+  --surface:#151816;
+  --surface2:#1c211e;
+  --surface3:#202722;
+  --border:rgba(255,255,255,.075);
+  --border2:rgba(255,255,255,.135);
+  --muted:#a3aaa2;
+  --hint:#6f7972;
+  --soft-shadow:0 18px 48px rgba(0,0,0,.30);
+  --panel-shadow:0 12px 34px rgba(0,0,0,.22);
+}
+html{
+  background:
+    linear-gradient(180deg,#090c0a 0%,#0d100e 42%,#080a09 100%);
+}
+body{
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.018),transparent 160px),
+    var(--bg);
+}
+.page-header{
+  background:rgba(10,13,11,.78)!important;
+  backdrop-filter:blur(18px);
+  border-bottom-color:rgba(255,255,255,.07)!important;
+}
+.page-title,
+.setup-title,
+.launch-card h1{
+  font-weight:900!important;
+}
+.page-sub,
+.setup-sub{
+  color:color-mix(in srgb,var(--muted) 88%,#fff)!important;
+}
+.card,
+.ex-card,
+.week-card,
+.timer-card,
+.timer-picker-card,
+.timer-detail-card,
+.session-runner-card,
+.stat-card,
+.coach-card,
+.choice-btn,
+.tip-card,
+.plan-summary-card,
+.plan-manager-card,
+.setup-dropdown,
+.custom-profile-panel,
+.options-section{
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.018)),
+    var(--surface)!important;
+  border-color:rgba(255,255,255,.09)!important;
+  box-shadow:var(--panel-shadow);
+}
+.card:hover,
+.ex-card:hover,
+.week-card:hover,
+.choice-btn:hover,
+.plan-calendar-day:hover{
+  border-color:color-mix(in srgb,var(--accent) 24%,rgba(255,255,255,.10))!important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02)),
+    var(--surface)!important;
+}
+.choice-btn.active,
+.profile-chip.active,
+.tab-bar .tab-btn.active,
+.plan-calendar-day.today,
+.week-card.today{
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--accent) 18%,transparent),rgba(255,255,255,.025)),
+    var(--surface)!important;
+  border-color:color-mix(in srgb,var(--accent) 42%,rgba(255,255,255,.10))!important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb,var(--accent) 8%,transparent),
+    0 14px 36px rgba(0,0,0,.26)!important;
+}
+.primary-btn,
+.program-main-action,
+.day-session-action,
+.start-btn:not(.running),
+.session-start-btn,
+.plan-save-btn,
+.immersive-main:not(.running){
+  background:
+    linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 58%,#67e8f9))!important;
+  color:#07100a!important;
+  border:0!important;
+  box-shadow:
+    0 14px 34px color-mix(in srgb,var(--accent) 18%,transparent),
+    inset 0 1px 0 rgba(255,255,255,.30)!important;
+}
+.primary-btn:hover,
+.program-main-action:hover,
+.day-session-action:hover,
+.start-btn:not(.running):hover,
+.session-start-btn:hover,
+.plan-save-btn:hover{
+  filter:saturate(1.08) brightness(1.03);
+}
+.timer-secondary-btn,
+.reset-btn,
+.launch-secondary,
+.preset-btn,
+.saved-session-actions button,
+.plan-load-actions .timer-secondary-btn{
+  background:rgba(255,255,255,.035)!important;
+  border-color:rgba(255,255,255,.10)!important;
+  color:color-mix(in srgb,var(--ink) 88%,var(--muted))!important;
+}
+.timer-secondary-btn:hover,
+.reset-btn:hover,
+.launch-secondary:hover,
+.preset-btn:hover{
+  border-color:color-mix(in srgb,var(--accent) 30%,rgba(255,255,255,.10))!important;
+  color:var(--accent)!important;
+}
+.tab-bar{
+  width:calc(100% - 24px)!important;
+  max-width:408px!important;
+  bottom:12px!important;
+  border:1px solid rgba(255,255,255,.09)!important;
+  border-radius:22px!important;
+  background:rgba(18,22,19,.86)!important;
+  backdrop-filter:blur(18px);
+  box-shadow:0 18px 44px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04);
+  padding:7px!important;
+}
+.tab-bar .tab-btn{
+  border-radius:16px!important;
+  transition:background .18s ease,color .18s ease,transform .18s ease,border-color .18s ease;
+}
+.tab-bar .tab-btn:active{
+  transform:scale(.97);
+}
+.tab-bar .tab-btn.active{
+  color:var(--accent)!important;
+}
+.timer-ring{
+  box-shadow:
+    0 18px 48px rgba(0,0,0,.36),
+    0 0 42px color-mix(in srgb,var(--timer-color,var(--accent)) 12%,transparent)!important;
+}
+.timer-display,
+.stat-value,
+.wpct{
+  text-shadow:0 0 22px color-mix(in srgb,var(--accent) 14%,transparent);
+}
+.prog-fill,
+.week-prog-fill,
+.timer-linear-fill,
+.program-hero-progress div{
+  background:
+    linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#67e8f9))!important;
+}
+input,
+select,
+textarea,
+.plan-load-select select,
+.plan-primary-select select,
+.setup-plan-day select,
+.custom-profile-manager select{
+  background:rgba(255,255,255,.045)!important;
+  border-color:rgba(255,255,255,.11)!important;
+  color:var(--ink)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+input:focus,
+select:focus,
+textarea:focus{
+  outline:none;
+  border-color:color-mix(in srgb,var(--accent) 48%,rgba(255,255,255,.16))!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)!important;
+}
+.ex-card{
+  transform-origin:center;
+}
+.ex-card.open{
+  box-shadow:var(--soft-shadow)!important;
+}
+.ex-card.done{
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,transparent),rgba(255,255,255,.018)),
+    var(--surface)!important;
+}
+.exercise-theme-section,
+.plan-subdrop,
+.plan-routine-shop,
+.options-section{
+  overflow:hidden;
+}
+.stat-card{
+  min-height:78px;
+}
+.coach-card{
+  line-height:1.5;
+}
+@media (prefers-reduced-motion:no-preference){
+  .tab-panel:not(.hidden){
+    animation:pageRise .34s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .card,
+  .ex-card,
+  .week-card,
+  .timer-card,
+  .session-runner-card,
+  .stat-card,
+  .coach-card,
+  .plan-summary-card,
+  .plan-manager-card,
+  .options-section{
+    animation:cardIn .32s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .ex-card:nth-child(2n),
+  .week-card:nth-child(2n),
+  .stat-card:nth-child(2n){
+    animation-delay:.035s;
+  }
+  .ex-card:nth-child(3n),
+  .week-card:nth-child(3n),
+  .stat-card:nth-child(3n){
+    animation-delay:.07s;
+  }
+  .card,
+  .ex-card,
+  .week-card,
+  .choice-btn,
+  .tab-btn,
+  .start-btn,
+  .program-main-action,
+  .timer-secondary-btn,
+  .preset-btn{
+    transition:transform .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease,filter .18s ease;
+  }
+  .choice-btn:active,
+  .ex-card:active,
+  .week-card:active,
+  .program-main-action:active,
+  .start-btn:active{
+    transform:scale(.985);
+  }
+  .tab-bar .tab-btn.active svg{
+    animation:navPop .34s cubic-bezier(.2,.8,.2,1);
+  }
+  .start-btn:not(.running),
+  .program-main-action:not(:disabled),
+  .session-start-btn:not(:disabled),
+  .primary-btn:not(:disabled){
+    position:relative;
+    overflow:hidden;
+  }
+  .start-btn:not(.running)::after,
+  .program-main-action:not(:disabled)::after,
+  .session-start-btn:not(:disabled)::after,
+  .primary-btn:not(:disabled)::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(110deg,transparent 0 34%,rgba(255,255,255,.28) 48%,transparent 62%);
+    translate:-120% 0;
+    opacity:.46;
+    animation:buttonSheen 4.8s ease-in-out infinite;
+    pointer-events:none;
+  }
+  .timer-card.is-running .timer-ring,
+  .immersive-timer.running .immersive-ring{
+    animation-duration:1.2s!important;
+  }
+  .timer-linear-fill,
+  .prog-fill,
+  .week-prog-fill,
+  .program-hero-progress div,
+  .immersive-bar div{
+    transition:width .42s cubic-bezier(.2,.8,.2,1);
+  }
+  .timer-color-dot.active span,
+  .timer-color-dot[aria-pressed="true"] span{
+    animation:colorDotPulse 1.8s ease-in-out infinite;
+  }
+}
+@keyframes pageRise{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(8px) scale(.992)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes navPop{
+  0%{transform:scale(.86)}
+  65%{transform:scale(1.12)}
+  100%{transform:scale(1)}
+}
+@keyframes buttonSheen{
+  0%,72%{translate:-120% 0}
+  100%{translate:120% 0}
+}
+@keyframes colorDotPulse{
+  0%,100%{filter:saturate(1);transform:scale(1)}
+  50%{filter:saturate(1.35);transform:scale(1.08)}
 }
