@@ -3,9 +3,16 @@
     auto:{label:'Auto',color:''},
     lime:{label:'Lime',color:'#bdf45b'},
     cyan:{label:'Cyan',color:'#67e8f9'},
+    ocean:{label:'Ocean',color:'#38bdf8'},
+    mint:{label:'Menthe',color:'#34d399'},
     violet:{label:'Violet',color:'#a78bfa'},
+    indigo:{label:'Indigo',color:'#818cf8'},
     amber:{label:'Ambre',color:'#f2c36b'},
-    rose:{label:'Rose',color:'#fb7185'}
+    orange:{label:'Orange',color:'#fb923c'},
+    rose:{label:'Rose',color:'#fb7185'},
+    magenta:{label:'Magenta',color:'#f472b6'},
+    red:{label:'Rouge',color:'#ef4444'},
+    white:{label:'Blanc',color:'#f8fafc'}
   };
   const TIMER_SKINS={
     watch:{label:'Montre'},

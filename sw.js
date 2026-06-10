@@ -1,4 +1,4 @@
-const CACHE_NAME='vv-sport-exercises-profile-timer-v53-immersive-media-fix';
+const CACHE_NAME='vv-sport-exercises-profile-timer-v59-immersive-spacing';
 const ASSETS=[
   './',
   './index.html',
