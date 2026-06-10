@@ -25,11 +25,48 @@ Puis ouvrir:
 http://localhost:8000
 ```
 
+## Build
+
+Le build utilise `esbuild` si les dependances sont installees:
+
+```bash
+npm install
+npm run build
+```
+
+Sans `npm install`, `node build.js` copie les fichiers `.min` sans minification risquee.
+
+## Creer un zip propre
+
+Ne zippe pas le dossier du projet a la main, sinon tu risques d'inclure `.git`.
+
+Utilise plutot:
+
+```powershell
+npm run release
+```
+
+ou directement:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/create-release.ps1
+```
+
+Le zip est cree avec `git archive`, donc le dossier `.git` n'est jamais inclus.
+
 ## Structure
 
 - `index.html`: structure de l'application.
 - `styles.css`: interface et responsive mobile.
 - `app.js`: logique de programme, minuteur, progression et PWA.
+- `src/storage.js`: acces securise au stockage local.
+- `src/ui.js`: helpers UI partages, scheduler de rendu et echappement HTML.
+- `src/program.js`: helpers du moteur programme et calendrier.
+- `src/events.js`: delegation des actions statiques sans `onclick` inline.
+- `src/timer.js`: shell du minuteur, couleurs et mode immersif.
+- `src/stats.js`: moteur de calcul des stats, historique et semaine.
+- `docs/architecture.md`: plan de decoupage progressif de `app.js`.
+- `scripts/create-release.ps1`: creation d'un zip de publication sans `.git`.
 - `manifest.webmanifest`: configuration d'installation PWA.
 - `sw.js`: cache hors-ligne.
 - `sound-*.wav`: sons du minuteur.

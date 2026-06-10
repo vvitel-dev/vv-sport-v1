@@ -1,0 +1,14 @@
+{
+  "name": "vv-sport-v1",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "check": "node --check app.js && node --check build.js && node --check src/storage.js && node --check src/ui.js && node --check src/program.js && node --check src/timer.js && node --check src/stats.js && node --check src/events.js",
+    "test:plan-visual": "node scripts/plan-visual-check.js",
+    "release": "powershell -ExecutionPolicy Bypass -File scripts/create-release.ps1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,0 +1,6 @@
+.gitignore export-ignore
+.gitattributes export-ignore
+.vscode export-ignore
+.agents export-ignore
+.codex export-ignore
+*.min export-ignore

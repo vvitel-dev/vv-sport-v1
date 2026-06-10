@@ -1,52 +1,14 @@
-
-
-const storageSafe = {
-  getItem(k){
-    try{
-      return window.localStorage.getItem(k);
-    }catch(e){
-      try{return localStorage.getItem(k)}catch(e2){return null}
-    }
-  },
-  setItem(k,v){
-    try{
-      window.localStorage.setItem(k,v);
-    }catch(e){
-      try{localStorage.setItem(k,v)}catch(e2){}
-    }
-  },
-  removeItem(k){
-    try{
-      window.localStorage.removeItem(k);
-    }catch(e){
-      try{localStorage.removeItem(k)}catch(e2){}
-    }
-  }
-};
+﻿const storageSafe = window.storageSafe;
+const renderScheduler = window.UIEngine.createRenderScheduler();
 
 // Performance optimization: Render debouncing with requestAnimationFrame
-let renderScheduled = false;
-let scheduledRender = null;
 function scheduleRender(renderFn) {
-  if (!renderScheduled) {
-    renderScheduled = true;
-    scheduledRender = renderFn;
-    requestAnimationFrame(() => {
-      if (scheduledRender) scheduledRender();
-      renderScheduled = false;
-      scheduledRender = null;
-    });
-  }
+  renderScheduler.schedule(renderFn);
 }
 
 // Render memoization to prevent duplicate consecutive renders
-let lastRenderState = null;
 function shouldRender() {
-  const state = { currentTab, programView, currentDay };
-  const stateStr = JSON.stringify(state);
-  if (lastRenderState === stateStr) return false;
-  lastRenderState = stateStr;
-  return true;
+  return renderScheduler.shouldRender({ currentTab, programView, currentDay });
 }
 
 const APP_VERSION='1.2.0';
@@ -127,6 +89,7 @@ function setYouTubeUrl(value){
   saveAppState();
 }
 function openSpotifyMusic(){
+  if(document.body.classList.contains('immersive-open'))closeImmersiveTimer();
   const embed=spotifyEmbedUrl(spotifyUrl);
   if(!embed){
     showTab('options');
@@ -146,7 +109,7 @@ function openSpotifyMusic(){
     sheet=document.createElement('div');
     sheet.id='spotify-player-sheet';
     sheet.className='spotify-player-sheet hidden';
-    sheet.innerHTML='<div class="spotify-player-head" id="spotify-player-drag"><span>Spotify</span><div><button type="button" onclick="minimizeSpotifyPlayer()" aria-label="Cacher Spotify">−</button><button type="button" onclick="closeSpotifyPlayer()" aria-label="Fermer Spotify">×</button></div></div><iframe id="spotify-player-frame" title="Lecteur Spotify" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>';
+    sheet.innerHTML='<div class="spotify-player-head" id="spotify-player-drag"><span>Spotify</span><div><button type="button" data-action="minimize-spotify" aria-label="Cacher Spotify">−</button><button type="button" data-action="close-spotify" aria-label="Fermer Spotify">×</button></div></div><iframe id="spotify-player-frame" title="Lecteur Spotify" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>';
     document.body.appendChild(sheet);
     makeSpotifyPlayerDraggable(sheet);
   }
@@ -158,6 +121,7 @@ function openSpotifyMusic(){
   updateSpotifyMiniButton(false);
 }
 function openYouTubeMusic(){
+  if(document.body.classList.contains('immersive-open'))closeImmersiveTimer();
   const embed=youtubeEmbedUrl(youtubeUrl);
   if(!embed){
     showTab('options');
@@ -177,7 +141,7 @@ function openYouTubeMusic(){
     sheet=document.createElement('div');
     sheet.id='youtube-player-sheet';
     sheet.className='spotify-player-sheet youtube-player-sheet hidden';
-    sheet.innerHTML='<div class="spotify-player-head" id="youtube-player-drag"><span>YouTube</span><div><button type="button" onclick="minimizeYouTubePlayer()" aria-label="Cacher YouTube">−</button><button type="button" onclick="closeYouTubePlayer()" aria-label="Fermer YouTube">×</button></div></div><iframe id="youtube-player-frame" title="Lecteur YouTube" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><div class="youtube-fallback" id="youtube-fallback"><strong>Lecture intégrée indisponible</strong><span>YouTube bloque parfois le lecteur intégré en local ou selon la vidéo.</span><button type="button" onclick="openYouTubeExternal()">Ouvrir sur YouTube</button></div>';
+    sheet.innerHTML='<div class="spotify-player-head" id="youtube-player-drag"><span>YouTube</span><div><button type="button" data-action="minimize-youtube" aria-label="Cacher YouTube">−</button><button type="button" data-action="close-youtube" aria-label="Fermer YouTube">×</button></div></div><iframe id="youtube-player-frame" title="Lecteur YouTube" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><div class="youtube-fallback" id="youtube-fallback"><strong>Lecture intégrée indisponible</strong><span>YouTube bloque parfois le lecteur intégré en local ou selon la vidéo.</span><button type="button" data-action="open-youtube-external">Ouvrir sur YouTube</button></div>';
     document.body.appendChild(sheet);
     makePlayerDraggable(sheet,'#youtube-player-drag');
   }
@@ -203,7 +167,7 @@ function updateYouTubeMiniButton(show){
     mini.innerHTML='<svg class="media-service-icon youtube-service-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="18" height="11" rx="3"></rect><path d="M10.5 9.5v5l4.4-2.5z"></path></svg>';
     mini.setAttribute('aria-label','Réouvrir YouTube');
     mini.title='Réouvrir YouTube';
-    mini.onclick=restoreYouTubePlayer;
+    mini.addEventListener('click',restoreYouTubePlayer);
     document.body.appendChild(mini);
   }
   mini.classList.toggle('hidden',!show);
@@ -241,7 +205,7 @@ function updateSpotifyMiniButton(show){
     mini.innerHTML='<svg class="media-service-icon spotify-service-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7.2 9.5c3.2-1 7.1-.7 9.7.8"></path><path d="M7.8 12.2c2.6-.8 5.7-.6 7.9.6"></path><path d="M8.5 14.8c1.9-.5 4.1-.4 5.7.5"></path></svg>';
     mini.setAttribute('aria-label','Réouvrir Spotify');
     mini.title='Réouvrir Spotify';
-    mini.onclick=restoreSpotifyPlayer;
+    mini.addEventListener('click',restoreSpotifyPlayer);
     document.body.appendChild(mini);
   }
   mini.classList.toggle('hidden',!show);
@@ -353,15 +317,7 @@ const COLOR_THEMES={
   violet:{label:'Violet',accent:'#a78bfa',dim:'rgba(167,139,250,.13)',accent2:'#67e8f9',accent3:'#f2c36b',bg:'#0e0c13',gradient:'linear-gradient(135deg,#a78bfa 0%,#7c3aed 50%,#67e8f9 100%)'}
 };
 let colorThemeKey=storageSafe.getItem('vv-color-theme')||'lime';
-const TIMER_PRESET_COLORS={
-  auto:{label:'Auto',color:''},
-  lime:{label:'Lime',color:'#bdf45b'},
-  cyan:{label:'Cyan',color:'#67e8f9'},
-  violet:{label:'Violet',color:'#a78bfa'},
-  amber:{label:'Ambre',color:'#f2c36b'},
-  rose:{label:'Rose',color:'#fb7185'}
-};
-let timerPresetColorKey=storageSafe.getItem('vv-timer-preset-color')||'auto';
+const TIMER_PRESET_COLORS=window.TimerShell.colors;
 function applyColorTheme(key=colorThemeKey){
   const theme=COLOR_THEMES[key]||COLOR_THEMES.lime;
   colorThemeKey=COLOR_THEMES[key]?key:'lime';
@@ -377,59 +333,33 @@ function applyColorTheme(key=colorThemeKey){
   if(meta)meta.setAttribute('content',theme.bg);
 }
 function timerColorForProfile(){
-  if(timerPresetColorKey&&timerPresetColorKey!=='auto'&&TIMER_PRESET_COLORS[timerPresetColorKey]){
-    return TIMER_PRESET_COLORS[timerPresetColorKey].color;
-  }
-  if(profile&&profile.level==='debutant')return '#67e8f9';
-  if(profile&&profile.level==='medium')return '#bdf45b';
-  if(profile&&profile.level==='expert')return '#a78bfa';
-  if(profile&&profile.level==='perso')return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#bdf45b';
-  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#bdf45b';
+  return window.TimerShell.colorForProfile(profile);
 }
 function applyTimerColor(){
-  document.documentElement.style.setProperty('--timer-color',timerColorForProfile());
+  window.TimerShell.applyColor(profile);
 }
 function setTimerPresetColor(key){
-  if(!TIMER_PRESET_COLORS[key])return;
-  timerPresetColorKey=key;
-  storageSafe.setItem('vv-timer-preset-color',key);
+  if(!window.TimerShell.setPresetColorKey(key))return;
   applyTimerColor();
   renderTimerColorPreset();
 }
+function setTimerSkin(key){
+  if(!window.TimerShell.setSkinKey(key))return;
+  applyTimerSkin();
+  window.TimerShell.renderImmersiveSkinPreset(escapeHTML);
+}
+function applyTimerSkin(){
+  const view=document.getElementById('immersive-timer');
+  if(!view||!window.TimerShell)return;
+  const skin=window.TimerShell.getSkinKey();
+  view.classList.remove('skin-watch','skin-chrono','skin-minimal');
+  view.classList.add('skin-'+skin);
+}
 function renderTimerColorPreset(){
-  const ring=document.getElementById('timer-ring');
-  if(!ring)return;
-  let tools=document.getElementById('timer-floating-tools');
-  if(!tools){
-    tools=document.createElement('div');
-    tools.id='timer-floating-tools';
-    tools.className='timer-floating-tools';
-    tools.innerHTML='<button class="timer-icon-btn" type="button" onclick="openImmersiveTimer()" title="Mode immersif" aria-label="Ouvrir le mode immersif"><span aria-hidden="true">⛶</span></button>';
-    ring.appendChild(tools);
-  }else if(tools.parentElement!==ring){
-    ring.appendChild(tools);
-  }
-  tools.querySelectorAll('.timer-spotify-btn,.timer-youtube-btn').forEach(btn=>btn.remove());
-  if(!tools.querySelector('[onclick="openImmersiveTimer()"]')){
-    tools.insertAdjacentHTML('afterbegin','<button class="timer-icon-btn" type="button" onclick="openImmersiveTimer()" title="Mode immersif" aria-label="Ouvrir le mode immersif"><span aria-hidden="true">⛶</span></button>');
-  }
-  let box=document.getElementById('timer-color-preset');
-  if(!box){
-    box=document.createElement('div');
-    box.id='timer-color-preset';
-    box.className='timer-color-preset timer-color-floating';
-    tools.appendChild(box);
-  }else if(box.parentElement!==tools){
-    tools.appendChild(box);
-  }
-  box.innerHTML=Object.entries(TIMER_PRESET_COLORS).map(([key,item])=>
-    '<button class="timer-color-dot '+(timerPresetColorKey===key?'active':'')+'" type="button" onclick="setTimerPresetColor(\''+key+'\')" title="'+escapeHTML(item.label)+'" aria-label="Couleur minuteur '+escapeHTML(item.label)+'" aria-pressed="'+(timerPresetColorKey===key?'true':'false')+'" style="--timer-choice:'+(item.color||'var(--timer-color,var(--accent))')+'">'+
-      '<span></span>'+
-    '</button>'
-  ).join('');
+  window.TimerShell.renderColorPreset({escapeHTML});
 }
 function isManualTimerMode(){
-  return timer.phase==='manual' || (timer.freeMode && !timer.exercise && !timer.exerciseData && timer.sourceDay===null);
+  return window.TimerShell.isManualMode(timer);
 }
 function updateTimerModeSwitch(){
   const manual=isManualTimerMode();
@@ -475,52 +405,11 @@ function activateExerciseTimerMode(){
   previewSelectedTimerExercise();
 }
 function openImmersiveTimer(){
-  const view=document.getElementById('immersive-timer');
-  if(!view)return;
-  if(view.parentElement!==document.body)document.body.appendChild(view);
-  document.documentElement.classList.add('immersive-root');
-  document.documentElement.style.width='100%';
-  document.documentElement.style.maxWidth='none';
-  document.documentElement.style.margin='0';
-  document.documentElement.style.padding='0';
-  document.body.style.width='100%';
-  document.body.style.maxWidth='none';
-  document.body.style.margin='0';
-  document.body.style.padding='0';
-  view.style.position='fixed';
-  view.style.inset='0';
-  view.style.width='100vw';
-  view.style.maxWidth='none';
-  view.style.height='100vh';
-  view.style.margin='0';
-  view.style.transform='none';
-  view.hidden=false;
-  view.classList.remove('hidden');
-  document.body.classList.add('immersive-open');
+  window.TimerShell.openImmersive();
   syncImmersiveTimer();
 }
 function closeImmersiveTimer(){
-  const view=document.getElementById('immersive-timer');
-  if(!view)return;
-  view.hidden=true;
-  view.classList.add('hidden');
-  document.body.classList.remove('immersive-open');
-  document.documentElement.classList.remove('immersive-root');
-  document.documentElement.style.width='';
-  document.documentElement.style.maxWidth='';
-  document.documentElement.style.margin='';
-  document.documentElement.style.padding='';
-  document.body.style.width='';
-  document.body.style.maxWidth='';
-  document.body.style.margin='';
-  document.body.style.padding='';
-  view.style.position='';
-  view.style.inset='';
-  view.style.width='';
-  view.style.maxWidth='';
-  view.style.height='';
-  view.style.margin='';
-  view.style.transform='';
+  window.TimerShell.closeImmersive();
 }
 function immersiveToggleTimer(){
   toggleTimer();
@@ -533,27 +422,13 @@ function immersiveRestartTimer(){
   setTimeout(syncImmersiveTimer,0);
 }
 function immersiveTimerTitle(){
-  if(timer.exercise)return timer.exercise;
-  if(timer.exerciseData&&timer.exerciseData.name)return timer.exerciseData.name;
-  if(guidedSession&&guidedSession.steps&&guidedSession.steps[guidedSession.index]){
-    return guidedSession.steps[guidedSession.index].name || 'Séance guidée';
-  }
-  if(timer.phase==='manual')return 'Chrono libre';
-  return 'Minuteur';
+  return window.TimerShell.immersiveTitle(timer,guidedSession);
 }
 function immersiveTimerSubtitle(){
-  if(guidedSession&&guidedSession.day)return guidedSession.day+' · séance guidée';
-  if(timer.context)return timer.context;
-  if(timer.exerciseData&&timer.exerciseData.target)return timer.exerciseData.target;
-  return 'Exercice sélectionné';
+  return window.TimerShell.immersiveSubtitle(timer,guidedSession);
 }
 function normalizeLabel(value){
-  return String(value||'')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g,'')
-    .replace(/\s+/g,' ')
-    .trim();
+  return window.TimerShell.normalizeLabel(value);
 }
 function syncImmersiveTimer(){
   const view=document.getElementById('immersive-timer');
@@ -574,6 +449,10 @@ function syncImmersiveTimer(){
   const ring=document.getElementById('immersive-ring');
   const main=document.getElementById('immersive-main-btn');
   const restart=document.getElementById('immersive-restart-btn');
+  applyTimerSkin();
+  window.TimerShell.renderImmersiveSkinPreset(escapeHTML);
+  view.classList.toggle('running',timer.running);
+  view.classList.toggle('paused',!timer.running&&hasActiveTimerSession());
   if(time)time.textContent=fmt(timer.left);
   if(titleEl)titleEl.textContent=title;
   if(subtitleEl)subtitleEl.textContent=subtitle;
@@ -604,7 +483,7 @@ function setColorTheme(key){
 }
 function colorThemeOptionsHTML(){
   return '<div class="theme-grid">'+Object.entries(COLOR_THEMES).map(([key,theme])=>
-    '<button class="theme-choice '+(colorThemeKey===key?'active':'')+'" type="button" onclick="setColorTheme(\''+key+'\')" aria-pressed="'+(colorThemeKey===key?'true':'false')+'" style="--swatch:'+theme.accent+';--swatch-gradient:'+theme.gradient+'">'+
+    '<button class="theme-choice '+(colorThemeKey===key?'active':'')+'" type="button" data-action="set-theme" data-theme="'+key+'" aria-pressed="'+(colorThemeKey===key?'true':'false')+'" style="--swatch:'+theme.accent+';--swatch-gradient:'+theme.gradient+'">'+
       '<span class="theme-swatch" aria-hidden="true"></span>'+
       '<span class="theme-choice-copy"><strong>'+escapeHTML(theme.label)+'</strong></span>'+
     '</button>'
@@ -1180,12 +1059,12 @@ ring_dip:`<svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" aria-hid
 </svg>`
 };
 const BASE={
-Lundi:{title:'Push — Pecs · Triceps · Épaules',duration:'55–70 min',warmup:'5 min tapis vitesse facile + rotations épaules',exercises:[
+Lundi:{title:'Push – Pecs · Triceps · Épaules',duration:'55–70 min',warmup:'5 min tapis vitesse facile + rotations épaules',exercises:[
 {name:'Pompes',sets:'4 × 8–15',target:'Pecs, triceps, gainage',how:'Corps droit, abdos serrés. Descends lentement puis pousse.',tips:'Ne creuse pas le dos.',svg:'push',type:'compose'},
 {name:'Dips',sets:'4 × 6–12',target:'Triceps, pecs, épaules',how:'Descends doucement, coudes vers l’arrière, puis remonte.',tips:'Aide-toi si trop dur.',svg:'default',type:'compose'},
 {name:'Élévations latérales',sets:'4 × 15–20',target:'Épaules',how:'Lève jusqu’aux épaules puis redescends lentement.',tips:'Pas d’élan.',svg:'db',type:'isolation'},
 {name:'Planche',sets:'3 × 1 min',target:'Gainage profond',how:'Avant-bras au sol, corps droit, abdos serrés.',tips:'Ne lève pas les fesses.',svg:'plank',type:'gainage'}]},
-Mardi:{title:'Pull — Dos · Biceps · Abdos',duration:'55–70 min',warmup:'5 min marche facile sur tapis',exercises:[
+Mardi:{title:'Pull – Dos · Biceps · Abdos',duration:'55–70 min',warmup:'5 min marche facile sur tapis',exercises:[
 {name:'Tractions',sets:'4 × MAX',target:'Dos, biceps',how:'Tire le menton au-dessus de la barre, descends lentement.',tips:'Pas d’élan.',svg:'default',type:'compose'},
 {name:'Rowing',sets:'4 × 10–15',target:'Dos, arrière épaules',how:'Tire vers la poitrine, serre les omoplates.',tips:'Contrôle la descente.',svg:'rings',type:'compose'},
 {name:'Curl haltères',sets:'4 × 15',target:'Biceps',how:'Monte vers les épaules puis redescends lentement.',tips:'Coudes fixes.',svg:'db',type:'isolation'},
@@ -1204,13 +1083,12 @@ Vendredi:{title:'Full Body',duration:'55–70 min',warmup:'Échauffement complet
 Samedi:{title:'Circuit',duration:'35–45 min',warmup:'Échauffement complet',exercises:[
 {name:'Circuit complet',sets:'3 tours',target:'Tout le corps',how:'Pompes, squats, abdos, gainage.',tips:'Repos si besoin.',svg:'default',type:'compose'},
 {name:'Abdos finisher',sets:'3 tours',target:'Abdos',how:'Crunch, relevés de jambes, gainage.',tips:'Qualité avant vitesse.',svg:'plank',type:'abdos'}]},
-Dimanche:{title:'Repos',duration:'—',warmup:'Récupération',exercises:[
+Dimanche:{title:'Repos',duration:'–',warmup:'Récupération',exercises:[
 {name:'Repos',sets:'Récupération',target:'Repos',how:'Hydratation, sommeil, marche légère possible.',tips:'Indispensable pour progresser.',svg:'rest',type:'repos'}]}
 };
-const DAYS=Object.keys(BASE);
+const DAYS=window.ProgramEngine.days(BASE);
 function getRealDay(){
-  const map=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-  return map[new Date().getDay()] || 'Lundi';
+  return window.ProgramEngine.getRealDay();
 }let profile={level:storageSafe.getItem('vv-level')||'',mode:storageSafe.getItem('vv-mode')||''};
 let soundEnabled=storageSafe.getItem('vv-sound')!=='0';
 const SOUND_FILES={
@@ -1256,13 +1134,7 @@ function renderEquipment(){
    if(el)el.classList.toggle('active',equipment[k]);
  });
 }let currentDay=(typeof getRealDay==='function'?getRealDay():'Lundi');let activeTab='today';
-let timer={seconds:90,left:90,interval:null,running:false,phase:'manual',context:'Chrono libre',exercise:null,exerciseData:null,effort:90,rest:0,totalPhase:90,prep:5,pendingStart:false,circuit:null,circuitIndex:0,sourceDay:null,sourceIndex:null};
-let timerTune={
-  effort:Math.max(15,Number(storageSafe.getItem('vv-timer-tune-effort'))||90),
-  rest:Math.max(0,Number(storageSafe.getItem('vv-timer-tune-rest'))||30),
-  prep:Math.max(0,Number(storageSafe.getItem('vv-timer-tune-prep'))||5)
-};
-function clone(o){return JSON.parse(JSON.stringify(o))}
+function clone(o){return window.ProgramEngine.clone(o)}
 
 
 
@@ -2000,7 +1872,7 @@ function adaptiveDay(day,title,slots,ctx,used){
 }
 
 function restDay(title='Repos'){
-  return {title,duration:'—',warmup:'Récupération',exercises:[
+  return {title,duration:'–',warmup:'Récupération',exercises:[
     {name:'Repos',sets:'Récupération',target:'Repos',how:'Hydratation, sommeil, marche légère possible.',tips:'Le repos fait partie du programme.',svg:'rest',type:'repos',effort:0,rest:0}
   ]};
 }
@@ -2074,14 +1946,14 @@ function adaptProgramByLevel(p){
   const hasDb=equipment.db;
 
   if(level==='debutant'){
-    p.Lundi.title='Push débutant — Technique · Pecs · Triceps';
+    p.Lundi.title='Push débutant – Technique · Pecs · Triceps';
     p.Lundi.duration='40–55 min';
     setExercise(p.Lundi.exercises[0],pushVariantForLevel());
     setExercise(p.Lundi.exercises[1],{name:'Dips assistés ou pompes serrées inclinées',sets:'3 × 6–10',target:'Triceps, pecs',how:'Utilise les pieds pour aider. Descends peu au début, sans douleur aux épaules.',tips:'Ne cherche pas l’échec. Progression propre semaine après semaine.',svg:hasRings?'rings':'push'});
     setExercise(p.Lundi.exercises[2],{name:hasDb?'Élévations latérales légères':'Y-T-W épaules au sol',sets:'3 × 12–18',target:'Épaules, posture',how:hasDb?'Monte sans élan jusqu’aux épaules, redescends lentement.':'Lève les bras en Y, T puis W, lentement.',tips:'Petit mouvement propre, aucune douleur.',svg:hasDb?'db':'mobility'});
     setExercise(p.Lundi.exercises[3],{name:'Gainage genoux ou planche courte',sets:'3 × 20–35 sec',target:'Gainage profond',how:'Choisis genoux au sol ou planche classique courte. Corps aligné, respiration calme.',tips:'Arrête dès que le bas du dos creuse.',svg:'plank'});
 
-    p.Mardi.title='Pull débutant — Dos · Posture · Biceps';
+    p.Mardi.title='Pull débutant – Dos · Posture · Biceps';
     setExercise(p.Mardi.exercises[0],{name:'Tractions assistées négatives',sets:'4 × 2–4',target:'Dos, biceps',how:'Monte avec aide, descends en 3 à 5 sec. Repose-toi assez.',tips:'Une répétition lente vaut mieux que plusieurs avec élan.',svg:'pull'});
     setExercise(p.Mardi.exercises[1],{name:hasRings?'Rowing anneaux facile':'Rowing haltères buste appuyé',sets:'3 × 10–15',target:'Dos, arrière épaules',how:hasRings?'Corps plus vertical pour réduire la difficulté, tire la poitrine vers les anneaux.':'Buste stable, tire les coudes vers l’arrière.',tips:'Serre les omoplates, contrôle la descente.',svg:hasRings?'rings':'db'});
     setExercise(p.Mardi.exercises[2],{name:hasDb?'Curl haltères contrôlé':'Curl serviette isométrique',sets:'3 × 12–18',target:'Biceps',how:hasDb?'Coudes fixes, descente lente.':'Tire contre une serviette avec contrôle.',tips:'Pas d’élan.',svg:hasDb?'db':'default'});
@@ -2092,25 +1964,25 @@ function adaptProgramByLevel(p){
     setExercise(p.Mercredi.exercises[2],{name:'Mountain climbers lents',sets:'3 × 20–30 sec',target:'Cardio, abdos',how:'Alterne les genoux lentement, épaules au-dessus des mains.',tips:'Bassin stable avant vitesse.',svg:'mountain'});
     setExercise(p.Mercredi.exercises[3],{name:'Gainage genoux',sets:'3 × 20–35 sec',target:'Core',how:'Genoux au sol si besoin, ligne épaules-hanches propre.',tips:'Respire, ne bloque pas.',svg:'plank'});
 
-    p.Vendredi.title='Full body débutant — Base propre';
+    p.Vendredi.title='Full body débutant – Base propre';
     setExercise(p.Vendredi.exercises[0],pushVariantForLevel());
     setExercise(p.Vendredi.exercises[1],{name:'Squats contrôlés',sets:'3 × 12–18',target:'Jambes, fessiers',how:'Descends à amplitude confortable, genoux stables, dos long.',tips:'Ajoute une pause en bas plutôt que de te précipiter.',svg:'legs'});
     setExercise(p.Vendredi.exercises[2],{name:'Gainage shoulder taps sur genoux',sets:'3 × 20–30 sec',target:'Core, stabilité épaules',how:'Depuis les genoux, touche une épaule puis l’autre sans bouger le bassin.',tips:'Lent et stable.',svg:'shoulder_tap'});
 
-    p.Samedi.title='Circuit débutant — Technique + souffle';
+    p.Samedi.title='Circuit débutant – Technique + souffle';
     setExercise(p.Samedi.exercises[0],{name:'Circuit poids du corps débutant',sets:'2–3 tours',target:'Tout le corps',how:'Pompes inclinées, squats contrôlés, rowing facile, gainage genoux.',tips:'Repos long si besoin. Tu dois finir propre.',svg:'circuit'});
     setExercise(p.Samedi.exercises[1],{name:'Abdos finisher facile',sets:'2 tours',target:'Abdos',how:'Crunch contrôlé, dead bug, gainage court.',tips:'Stop si le dos cambre.',svg:'plank'});
   }
 
   if(level==='expert'){
-    p.Lundi.title='Push expert — Intensité · Tempo · Stabilité';
+    p.Lundi.title='Push expert – Intensité · Tempo · Stabilité';
     p.Lundi.duration='60–75 min';
     setExercise(p.Lundi.exercises[0],pushVariantForLevel());
     setExercise(p.Lundi.exercises[1],{name:hasRings?'Dips anneaux assistés tempo':'Dips profonds tempo',sets:'5 × 5–10',target:'Triceps, pecs, épaules',how:'Descente 3 sec, épaules basses, pause courte, remonte puissant.',tips:'Stop si douleur épaule. Intensité oui, ego non.',svg:hasRings?'rings':'dip'});
     setExercise(p.Lundi.exercises[2],{name:hasDb?'Élévations latérales 1,5 reps':'Pike push-ups tempo',sets:hasDb?'5 × 15–25':'5 × 6–12',target:'Épaules',how:hasDb?'Monte, demi-descente, remonte, puis descente complète.':'Hanches hautes, descente lente, pousse verticalement.',tips:'Brûlure contrôlée, pas d’élan.',svg:hasDb?'db':'pike'});
     setExercise(p.Lundi.exercises[3],{name:'Gainage RKC',sets:'4 × 30–45 sec',target:'Gainage profond',how:'Contracte abdos, fessiers et quadriceps très fort.',tips:'Court mais intense.',svg:'plank'});
 
-    p.Mardi.title='Pull expert — Tractions · Rowing lourd · Core';
+    p.Mardi.title='Pull expert – Tractions · Rowing lourd · Core';
     setExercise(p.Mardi.exercises[0],{name:'Tractions strictes + négatives',sets:'5 × 3–6 + 1 négative',target:'Dos, biceps',how:'Tractions propres, puis une négative lente sur la dernière rep.',tips:'Garde 1 rep propre en réserve sur les premières séries.',svg:'pull'});
     setExercise(p.Mardi.exercises[1],{name:hasRings?'Rowing anneaux pieds avancés':'Rowing haltères tempo 5 kg',sets:'5 × 10–15',target:'Dos, arrière épaules',how:hasRings?'Corps plus horizontal, tire haut vers les côtes.':'Tempo 4 sec en descente, contraction forte en haut.',tips:'Équilibre la poussée avec beaucoup de tirage.',svg:hasRings?'rings':'db'});
     setExercise(p.Mardi.exercises[2],{name:hasDb?'Curl haltères myo-reps':'Curl isométrique serviette',sets:'4 × 15–25 + mini-série',target:'Biceps',how:'Après la série, respire 15 sec puis ajoute 4–6 reps propres.',tips:'Ne triche pas avec le dos.',svg:hasDb?'db':'default'});
@@ -2121,12 +1993,12 @@ function adaptProgramByLevel(p){
     setExercise(p.Mercredi.exercises[2],{name:'Mountain climbers rapides propres',sets:'5 × 35–45 sec',target:'Cardio, abdos',how:'Cadence élevée mais bassin stable.',tips:'Épaules solides au-dessus des mains.',svg:'mountain'});
     setExercise(p.Mercredi.exercises[3],{name:'Planche dynamique',sets:'4 × 45–60 sec',target:'Core, épaules',how:'Alterne planche, shoulder taps et blocage propre.',tips:'Zéro rotation du bassin.',svg:'shoulder_tap'});
 
-    p.Vendredi.title='Full body expert — Hypertrophie dense';
+    p.Vendredi.title='Full body expert – Hypertrophie dense';
     setExercise(p.Vendredi.exercises[0],pushVariantForLevel());
     setExercise(p.Vendredi.exercises[1],{name:'Bulgarian split squat tempo',sets:'5 × 10–15 / jambe',target:'Jambes, fessiers',how:'Descente 3 sec, pause en bas, remonte fort.',tips:'Unilatéral pour rendre les jambes difficiles sans charge lourde.',svg:'split'});
     setExercise(p.Vendredi.exercises[2],{name:'Gainage dynamique avancé',sets:'4 × 45–60 sec',target:'Core, épaules',how:'Shoulder taps, planche bras tendus, contrôle total.',tips:'Qualité stricte malgré la fatigue.',svg:'shoulder_tap'});
 
-    p.Samedi.title='Circuit expert — Densité · Finisher';
+    p.Samedi.title='Circuit expert – Densité · Finisher';
     setExercise(p.Samedi.exercises[0],{name:hasRings?'Circuit anneaux expert':'Circuit complet expert',sets:'4–5 tours',target:'Tout le corps',how:hasRings?'Ring rows, ring push-ups, support hold, Bulgarian split squat.':'Pompes profondes, Bulgarian split squat, rowing, gainage RKC.',tips:'Repos court mais technique parfaite.',svg:'circuit'});
     setExercise(p.Samedi.exercises[1],{name:'Abdos finisher expert',sets:'4 tours',target:'Abdos',how:'Hollow hold, relevés de jambes tempo, mountain climbers.',tips:'Brûlure ok, douleur lombaire non.',svg:'hollow'});
   }
@@ -2207,11 +2079,25 @@ function equipmentChoicesHTML(){
   ];
 
   return items.map(([k,title,desc])=>`
-    <button class="choice-btn equipment-choice ${equipment[k]?'active':''}" id="toggle-${k}" onclick="toggleEquipment('${k}')">
+    <button class="choice-btn equipment-choice ${equipment[k]?'active':''}" id="toggle-${k}" data-action="toggle-equipment" data-equipment="${k}">
       <strong>${title}</strong>
       <span>${desc}</span>
     </button>
   `).join('');
+}
+
+function equipmentSummaryText(){
+  const labels={
+    rings:'Anneaux',
+    push:'Supports',
+    db:'Haltères',
+    treadmill:'Tapis',
+    bike:'Vélo'
+  };
+  const active=Object.keys(labels).filter(k=>equipment[k]).map(k=>labels[k]);
+  if(!active.length)return 'Aucun matériel';
+  if(active.length<=2)return active.join(' · ');
+  return active.slice(0,2).join(' · ')+' +'+(active.length-2);
 }
 
 
@@ -2249,27 +2135,27 @@ function customProfileFormHTML(){
   const profileOptions=profiles.map(p=>`<option value="${escapeHTML(p.id)}" ${p.id===c.id?'selected':''}>${escapeHTML(profileDisplayName(p))}</option>`).join('');
   return `
     <div class="custom-profile-panel ${profile.level==='perso'?'active':''} ${customProfileOpen?'open':''}">
-      <button class="custom-profile-head" type="button" onclick="toggleCustomProfilePanel()" aria-expanded="${customProfileOpen?'true':'false'}">
+      <button class="custom-profile-head" type="button" data-action="toggle-custom-profile" aria-expanded="${customProfileOpen?'true':'false'}">
         <span><strong>Profil personnalisé</strong><em>${escapeHTML(customProfileSummary())}</em></span>
         <b>${customProfileOpen?'Fermer':'Modifier'}</b>
       </button>
       ${customProfileOpen?`
       <div class="custom-profile-manager">
         <label>Profil actif
-          <select onchange="selectCustomProfile(this.value)">${profileOptions}</select>
+          <select data-action="select-custom-profile">${profileOptions}</select>
         </label>
-        <button type="button" onclick="createCustomProfile()">Nouveau</button>
-        <button type="button" class="danger-mini" onclick="deleteCustomProfile('${escapeHTML(c.id)}')">Supprimer</button>
+        <button type="button" data-action="create-custom-profile">Nouveau</button>
+        <button type="button" class="danger-mini" data-action="delete-custom-profile" data-id="${escapeHTML(c.id)}">Supprimer</button>
       </div>
       <div class="custom-form-grid">
-        <label>Pseudo <input type="text" value="${escapeHTML(c.name)}" placeholder="Ton pseudo" oninput="saveCustomProfileField('name',this.value)"></label>
-        <label>Âge <input type="number" min="12" max="90" value="${escapeHTML(c.age)}" placeholder="38" oninput="saveCustomProfileField('age',this.value)"></label>
-        <label>Poids <input type="number" min="30" max="200" value="${escapeHTML(c.weight)}" placeholder="72" oninput="saveCustomProfileField('weight',this.value)"></label>
-        <label>Taille <input type="number" min="120" max="230" value="${escapeHTML(c.height)}" placeholder="178" oninput="saveCustomProfileField('height',this.value)"></label>
+        <label>Pseudo <input type="text" value="${escapeHTML(c.name)}" placeholder="Ton pseudo" data-action="custom-profile-field" data-field="name"></label>
+        <label>Âge <input type="number" min="12" max="90" value="${escapeHTML(c.age)}" placeholder="38" data-action="custom-profile-field" data-field="age"></label>
+        <label>Poids <input type="number" min="30" max="200" value="${escapeHTML(c.weight)}" placeholder="72" data-action="custom-profile-field" data-field="weight"></label>
+        <label>Taille <input type="number" min="120" max="230" value="${escapeHTML(c.height)}" placeholder="178" data-action="custom-profile-field" data-field="height"></label>
       </div>
       <div class="custom-form-grid">
         <label>Objectif
-          <select onchange="saveCustomProfileField('goal',this.value)">
+          <select data-action="custom-profile-field" data-field="goal">
             <option value="muscle" ${selected('goal','muscle')}>Prise musculaire</option>
             <option value="strength" ${selected('goal','strength')}>Force</option>
             <option value="fatloss" ${selected('goal','fatloss')}>Perte de gras</option>
@@ -2278,14 +2164,14 @@ function customProfileFormHTML(){
           </select>
         </label>
         <label>Niveau réel
-          <select onchange="saveCustomProfileField('experience',this.value)">
+          <select data-action="custom-profile-field" data-field="experience">
             <option value="beginner" ${selected('experience','beginner')}>Débutant</option>
             <option value="intermediate" ${selected('experience','intermediate')}>Intermédiaire</option>
             <option value="advanced" ${selected('experience','advanced')}>Avancé</option>
           </select>
         </label>
         <label>Séances/semaine
-          <select onchange="saveCustomProfileField('sessions',this.value)">
+          <select data-action="custom-profile-field" data-field="sessions">
             <option value="3" ${selected('sessions','3')}>3</option>
             <option value="4" ${selected('sessions','4')}>4</option>
             <option value="5" ${selected('sessions','5')}>5</option>
@@ -2293,7 +2179,7 @@ function customProfileFormHTML(){
           </select>
         </label>
         <label>Temps/séance
-          <select onchange="saveCustomProfileField('sessionTime',this.value)">
+          <select data-action="custom-profile-field" data-field="sessionTime">
             <option value="30" ${selected('sessionTime','30')}>30 min</option>
             <option value="45" ${selected('sessionTime','45')}>45 min</option>
             <option value="60" ${selected('sessionTime','60')}>60 min</option>
@@ -2301,13 +2187,13 @@ function customProfileFormHTML(){
         </label>
       </div>
       <div class="custom-form-grid performance-grid">
-        <label>Pompes propres <input type="number" min="0" max="100" value="${escapeHTML(c.pushups)}" oninput="saveCustomProfileField('pushups',this.value)"></label>
-        <label>Tractions <input type="number" min="0" max="50" value="${escapeHTML(c.pullups)}" oninput="saveCustomProfileField('pullups',this.value)"></label>
-        <label>Gainage sec <input type="number" min="0" max="600" value="${escapeHTML(c.plank)}" oninput="saveCustomProfileField('plank',this.value)"></label>
+        <label>Pompes propres <input type="number" min="0" max="100" value="${escapeHTML(c.pushups)}" data-action="custom-profile-field" data-field="pushups"></label>
+        <label>Tractions <input type="number" min="0" max="50" value="${escapeHTML(c.pullups)}" data-action="custom-profile-field" data-field="pullups"></label>
+        <label>Gainage sec <input type="number" min="0" max="600" value="${escapeHTML(c.plank)}" data-action="custom-profile-field" data-field="plank"></label>
       </div>
       <div class="custom-form-grid">
         <label>Priorité
-          <select onchange="saveCustomProfileField('focus',this.value)">
+          <select data-action="custom-profile-field" data-field="focus">
             <option value="balanced" ${selected('focus','balanced')}>Équilibré</option>
             <option value="push" ${selected('focus','push')}>Pecs / triceps</option>
             <option value="pull" ${selected('focus','pull')}>Dos / tractions</option>
@@ -2316,7 +2202,7 @@ function customProfileFormHTML(){
           </select>
         </label>
         <label>Limite à respecter
-          <select onchange="saveCustomProfileField('limitation',this.value)">
+          <select data-action="custom-profile-field" data-field="limitation">
             <option value="none" ${selected('limitation','none')}>Aucune</option>
             <option value="shoulder" ${selected('limitation','shoulder')}>Épaules</option>
             <option value="back" ${selected('limitation','back')}>Dos</option>
@@ -2331,7 +2217,7 @@ function customProfileFormHTML(){
 
 function renderChoices(){
   const levelHTML=Object.entries(LEVELS).map(([k,v])=>`
-    <button class="choice-btn ${profile.level===k?'active':''}" onclick="selectLevel('${k}')">
+    <button class="choice-btn ${profile.level===k?'active':''}" data-action="select-level" data-level="${k}">
       <strong>${v.label}</strong>
       <span>${v.desc||v.sub||''}</span>
     </button>
@@ -2339,13 +2225,17 @@ function renderChoices(){
 
   const levelBox=document.getElementById('level-choices');
   const modeBox=document.getElementById('mode-choices');
+  const levelSummary=document.getElementById('setup-level-summary');
+  const equipmentSummary=document.getElementById('setup-equipment-summary');
 
   if(levelBox)levelBox.innerHTML=levelHTML;
   if(modeBox)modeBox.innerHTML=`
     ${profile.level==='perso'&&customProfileOpen?customProfileFormHTML():''}
-    <div class="setup-label full-label">Matériel disponible</div>
     ${equipmentChoicesHTML()}
   `;
+  if(levelSummary)levelSummary.textContent=(profile.level&&LEVELS[profile.level]) ? LEVELS[profile.level].label : 'À choisir';
+  if(equipmentSummary)equipmentSummary.textContent=equipmentSummaryText();
+  if(typeof renderSetupPlan==='function')renderSetupPlan();
 }
 function showProfileSetup(){
   storageSafe.removeItem('vv-ready');
@@ -2361,7 +2251,26 @@ function showProfileSetup(){
 
   renderChoices();
 }
-function saveProfileAndEnter(){
+
+function hideIntroScreen(){
+  const intro=document.getElementById('intro-screen');
+  if(!intro)return;
+  intro.classList.add('hide');
+  window.sessionStorage&&sessionStorage.setItem('vv-intro-seen','1');
+  setTimeout(()=>intro.classList.add('hidden'),520);
+}
+
+function initIntroScreen(){
+  const intro=document.getElementById('intro-screen');
+  if(!intro)return;
+  const seen=window.sessionStorage&&sessionStorage.getItem('vv-intro-seen')==='1';
+  if(seen){
+    intro.classList.add('hidden');
+    return;
+  }
+  setTimeout(hideIntroScreen,1700);
+}
+function saveProfileAndEnter(targetTab='program'){
   if(!profile.level){
     alert('Choisis ton niveau et le matériel disponible');
     return;
@@ -2379,7 +2288,12 @@ function saveProfileAndEnter(){
   document.getElementById('setup-screen').classList.add('hidden');
   document.getElementById('app-screen').classList.remove('hidden');
   renderAll();
-  showTab('today');
+  if(targetTab==='exercises')showTab('exercises');
+  else if(targetTab==='plan')showTab('plan');
+  else{
+    showTab('program');
+    showProgramView('today',{keepDay:true});
+  }
 }
 
 function todayKey(){
@@ -2397,20 +2311,19 @@ function dateFromKey(key){
   return new Date(Number(parts[0]),Number(parts[1])-1,Number(parts[2]));
 }
 function programDayForDate(date){
-  return DAYS[(date.getDay()+6)%7] || 'Lundi';
+  return window.ProgramEngine.dayForDate(date,DAYS);
 }
 function isRestProgramDay(dayName){
-  const day=P()[dayName];
-  return dayName==='Dimanche' || !!(day && day.exercises && day.exercises.length && day.exercises.every(ex=>ex.type==='repos'));
+  return window.ProgramEngine.isRestProgramDay(dayName,P());
 }
 function isRestDateKey(key){
   return isRestProgramDay(programDayForDate(dateFromKey(key)));
 }
 function getHistory(){
-  try{return JSON.parse(storageSafe.getItem('vv-history')||'[]')}catch(e){return[]}
+  return window.StatsEngine.getHistory(storageSafe);
 }
 function saveHistory(list){
-  storageSafe.setItem('vv-history',JSON.stringify(list.slice(-120)));
+  window.StatsEngine.saveHistory(storageSafe,list);
 }
 function logExerciseDone(ex,day=currentDay){
   if(!ex || ex.type==='repos')return;
@@ -2427,48 +2340,19 @@ function logExerciseDone(ex,day=currentDay){
   saveHistory(list);
 }
 function statsSummary(){
-  const list=getHistory();
-  const byDate={};
-  let exercises=0, minutes=0;
-  list.forEach(x=>{
-    if((x.exercise||'').toLowerCase()==='repos')return;
-    byDate[x.date]=(byDate[x.date]||0)+1;
-    exercises++;
-    minutes+=x.minutes||2;
+  return window.StatsEngine.summary({
+    history:getHistory(),
+    dateKey,
+    isRestDateKey
   });
-  const sessions=Object.keys(byDate).length;
-  let streak=0;
-  const d=new Date();
-  for(let i=0;i<60;i++){
-    const key=dateKey(d);
-    if(byDate[key]){streak++;d.setDate(d.getDate()-1)}
-    else if(isRestDateKey(key)){d.setDate(d.getDate()-1)}
-    else break;
-  }
-  return {list,byDate,sessions,exercises,minutes,streak};
 }
 
 function weekStatsSummary(){
-  const rows=DAYS.map(day=>{
-    const exercises=(P()[day]&&P()[day].exercises?P()[day].exercises:[]).filter(ex=>ex.type!=='repos');
-    const total=exercises.length;
-    const done=exercises.filter(ex=>getDone(ex,day)).length;
-    return {day,total,done,pct:total?Math.round(done/total*100):0,rest:!total};
+  return window.StatsEngine.weekSummary({
+    days:DAYS,
+    getProgram:P,
+    getDone
   });
-  const workoutDays=rows.filter(x=>!x.rest);
-  const doneDays=workoutDays.filter(x=>x.total && x.done>=x.total).length;
-  const totalExercises=workoutDays.reduce((sum,x)=>sum+x.total,0);
-  const doneExercises=workoutDays.reduce((sum,x)=>sum+x.done,0);
-  const restDays=rows.filter(x=>x.rest).length;
-  return {
-    rows,
-    doneDays,
-    workoutDays:workoutDays.length,
-    restDays,
-    totalExercises,
-    doneExercises,
-    pct:totalExercises?Math.round(doneExercises/totalExercises*100):0
-  };
 }
 
 function weekStatsHTML(){
@@ -2506,7 +2390,7 @@ function coachAdvice(){
   return "Séance terminée. Bien joué. Note ce qui était facile ou difficile, puis laisse le corps récupérer.";
 }
 function escapeHTML(v){
-  return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});
+  return window.UIEngine.escapeHTML(v);
 }
 function tutorialSearchQuery(ex){
   const name=(ex&&ex.name)||'exercice';
@@ -2566,27 +2450,16 @@ document.addEventListener('toggle',event=>{
 },true);
 function tutorialLinkHTML(ex){
   if(!ex || ex.type==='repos')return '';
-  return '<button class="tutorial-link" type="button" onclick="event.stopPropagation();openTutorialSearchEncoded(\''+encodeURIComponent(tutorialSearchQuery(ex))+'\')">Voir un tuto YouTube</button>';
+  return '<button class="tutorial-link" type="button" data-action="open-tutorial" data-query="'+encodeURIComponent(tutorialSearchQuery(ex))+'">Voir un tuto YouTube</button>';
 }
 function formatHistoryDate(key){
-  const d=dateFromKey(key);
-  try{return d.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}catch(e){return key;}
+  return window.StatsEngine.formatHistoryDate(key,dateFromKey);
 }
 function formatChartDay(date){
-  try{return date.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','').slice(0,3);}catch(e){return '';}
+  return window.StatsEngine.formatChartDay(date);
 }
 function groupHistoryByDate(list){
-  const groups={};
-  (list||[]).forEach(x=>{
-    const k=x.date||todayKey();
-    if(!groups[k])groups[k]=[];
-    groups[k].push(x);
-  });
-  return Object.keys(groups).sort().reverse().map(date=>({
-    date,
-    items:groups[date].sort((a,b)=>(b.time||0)-(a.time||0)),
-    minutes:groups[date].reduce((sum,x)=>sum+(x.minutes||2),0)
-  }));
+  return window.StatsEngine.groupHistoryByDate(list,todayKey);
 }
 function resetStats(){
   if(!confirm('Réinitialiser toutes les stats et l’historique ?'))return;
@@ -2673,7 +2546,7 @@ function resetProfileData(){
   youtubeUrl='';
   colorThemeKey='lime';
   applyColorTheme(colorThemeKey);
-  timerPresetColorKey='auto';
+  window.TimerShell.setPresetColorKey('auto');
   applyTimerColor();
   showProfileSetup();
 }
@@ -2724,7 +2597,7 @@ function renderStats(){
     hist.innerHTML=groups.map((g,idx)=>{
       const count=g.items.length;
       const rows=g.items.map(x=>{
-        const time=x.time ? new Date(x.time).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '—';
+        const time=x.time ? new Date(x.time).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '–';
         return '<div class="history-detail-item"><div><strong>'+escapeHTML(x.exercise||'Exercice')+'</strong><small>'+escapeHTML(time)+' · '+escapeHTML(x.day||'')+' · '+escapeHTML(x.level||'')+' · '+escapeHTML(x.mode||'')+'</small></div><div class="prog-pct">'+(x.minutes||2)+'min</div></div>';
       }).join('');
       return '<details class="history-day" '+(idx===0?'open':'')+'><summary><div><strong>'+escapeHTML(formatHistoryDate(g.date))+'</strong><small>'+count+' exercice'+(count>1?'s':'')+' · '+g.minutes+' min</small></div><span class="history-chevron">⌄</span></summary><div class="history-detail-list">'+rows+'</div></details>';
@@ -3051,7 +2924,7 @@ function startSelectedTimerExercise(){
 
 function renderOptions(){
   const levelHTML=Object.entries(LEVELS).map(([k,v])=>`
-    <button class="choice-btn ${profile.level===k?'active':''}" onclick="selectLevel('${k}')">
+    <button class="choice-btn ${profile.level===k?'active':''}" data-action="select-level" data-level="${k}">
       <strong>${v.label}</strong>
       <span>${v.desc||v.sub||''}</span>
     </button>
@@ -3069,21 +2942,31 @@ function renderOptions(){
   opt.innerHTML=`
     <div class="page-header compact options-hero">
       <div>
-        <h2>Options</h2>
+        <h2>Profil</h2>
         <p>Réglages du profil et de l’app</p>
       </div>
     </div>
 
     <div class="options-stack">
+      <div class="options-group">
+        <div class="options-group-title">Profil</div>
       <details class="options-section options-dropdown" data-options-section="level"${optionOpenAttr('level')}>
         <summary><span>Niveau</span></summary>
         <div class="choice-grid">${levelHTML}</div>
         ${profile.level==='perso'&&customProfileOpen?'<div class="options-form-wrap">'+customProfileFormHTML()+'</div>':''}
       </details>
 
+      <details class="options-section options-dropdown" data-options-section="equipment"${optionOpenAttr('equipment')}>
+        <summary><span>Matériel disponible</span></summary>
+        <div class="choice-grid">${equipmentChoicesHTML()}</div>
+      </details>
+      </div>
+
+      <div class="options-group">
+        <div class="options-group-title">Préférences</div>
       <details class="options-section options-dropdown options-section-inline" data-options-section="timer"${optionOpenAttr('timer')}>
         <summary><span>Minuteur son</span></summary>
-        <button id="sound-toggle" class="sound-segment ${soundEnabled?'active':''}" type="button" aria-pressed="${soundEnabled?'true':'false'}" onclick="toggleSoundOption()">
+        <button id="sound-toggle" class="sound-segment ${soundEnabled?'active':''}" type="button" aria-pressed="${soundEnabled?'true':'false'}" data-action="toggle-sound">
           <span>Off</span>
           <strong>On</strong>
         </button>
@@ -3099,71 +2982,70 @@ function renderOptions(){
         <div class="spotify-options">
           <label class="spotify-field">
             <span>Lien Spotify</span>
-            <input id="spotify-url-input" type="url" value="${escapeHTML(spotifyUrl)}" placeholder="https://open.spotify.com/playlist/..." oninput="setSpotifyUrl(this.value)">
+            <input id="spotify-url-input" type="url" value="${escapeHTML(spotifyUrl)}" placeholder="https://open.spotify.com/playlist/..." data-action="spotify-url">
           </label>
           <div class="spotify-actions">
-            <button type="button" class="spotify-open-btn ${cleanSpotifyUrl(spotifyUrl)?'connected':''}" onclick="openSpotifyMusic()">${cleanSpotifyUrl(spotifyUrl)?'Ouvrir Spotify':'Ajouter un lien'}</button>
-            <button type="button" class="spotify-clear-btn" onclick="setSpotifyUrl('')">Supprimer</button>
+            <button type="button" class="spotify-open-btn ${cleanSpotifyUrl(spotifyUrl)?'connected':''}" data-action="open-spotify">${cleanSpotifyUrl(spotifyUrl)?'Ouvrir Spotify':'Ajouter un lien'}</button>
+            <button type="button" class="spotify-clear-btn" data-action="clear-media" data-media="spotify">Supprimer</button>
           </div>
           <label class="spotify-field">
             <span>Lien YouTube</span>
-            <input id="youtube-url-input" type="url" value="${escapeHTML(youtubeUrl)}" placeholder="https://youtube.com/watch?v=... ou playlist" oninput="setYouTubeUrl(this.value)">
+            <input id="youtube-url-input" type="url" value="${escapeHTML(youtubeUrl)}" placeholder="https://youtube.com/watch?v=... ou playlist" data-action="youtube-url">
           </label>
           <div class="spotify-actions">
-            <button type="button" class="spotify-open-btn youtube-open-btn ${youtubeEmbedUrl(youtubeUrl)?'connected':''}" onclick="openYouTubeMusic()">${youtubeEmbedUrl(youtubeUrl)?'Ouvrir YouTube':'Ajouter un lien'}</button>
-            <button type="button" class="spotify-clear-btn" onclick="setYouTubeUrl('')">Supprimer</button>
+            <button type="button" class="spotify-open-btn youtube-open-btn ${youtubeEmbedUrl(youtubeUrl)?'connected':''}" data-action="open-youtube">${youtubeEmbedUrl(youtubeUrl)?'Ouvrir YouTube':'Ajouter un lien'}</button>
+            <button type="button" class="spotify-clear-btn" data-action="clear-media" data-media="youtube">Supprimer</button>
           </div>
           <p class="options-section-note">Colle un lien Spotify ou YouTube. L’app l’ouvre en overlay pendant ta séance sans modifier tes stats.</p>
         </div>
       </details>
+      </div>
 
-      <details class="options-section options-dropdown" data-options-section="equipment"${optionOpenAttr('equipment')}>
-        <summary><span>Matériel disponible</span></summary>
-        <div class="choice-grid">${equipmentChoicesHTML()}</div>
-      </details>
-
+      <div class="options-group options-data-group">
+        <div class="options-group-title">Données</div>
       <details class="options-section options-dropdown" data-options-section="data"${optionOpenAttr('data')}>
         <summary><span>Données</span></summary>
         <div class="choice-grid options-data-grid">
-          <button class="choice-btn" type="button" onclick="exportUserData()">
+          <button class="choice-btn" type="button" data-action="export-data">
             <strong>Exporter mes données</strong>
             <span>Sauvegarde profil, notes, progression et stats en JSON.</span>
           </button>
-          <button class="choice-btn" type="button" onclick="triggerImportUserData()">
+          <button class="choice-btn" type="button" data-action="import-data">
             <strong>Importer une sauvegarde</strong>
             <span>Restaure un fichier exporté depuis vV Sport.</span>
           </button>
-          <input id="import-data-input" class="hidden" type="file" accept="application/json,.json" onchange="importUserData(this.files&&this.files[0]);this.value=''">
+          <input id="import-data-input" class="hidden" type="file" accept="application/json,.json" data-action="import-file">
         </div>
       </details>
 
       <details class="options-section options-dropdown options-danger-section" data-options-section="reset"${optionOpenAttr('reset')}>
         <summary><span>Réinitialiser</span></summary>
         <div class="choice-grid danger-grid">
-          <button class="choice-btn danger-choice" type="button" onclick="resetProgressData()">
+          <button class="choice-btn danger-choice" type="button" data-action="reset-progress">
             <strong>Progression cochée</strong>
             <span>Garde les notes, stats et réglages.</span>
           </button>
-          <button class="choice-btn danger-choice" type="button" onclick="resetNotesData()">
+          <button class="choice-btn danger-choice" type="button" data-action="reset-notes">
             <strong>Notes personnelles</strong>
             <span>Supprime seulement les notes des cartes.</span>
           </button>
-          <button class="choice-btn danger-choice" type="button" onclick="resetStats()">
+          <button class="choice-btn danger-choice" type="button" data-action="reset-stats">
             <strong>Stats et historique</strong>
             <span>Remet à zéro les séances, exercices et streak.</span>
           </button>
-          <button class="choice-btn danger-choice" type="button" onclick="resetProfileData()">
+          <button class="choice-btn danger-choice" type="button" data-action="reset-profile">
             <strong>Profil et matériel</strong>
             <span>Relance la configuration initiale.</span>
           </button>
         </div>
       </details>
+      </div>
     </div>
 
     <div class="app-version">${escapeHTML(cleanAppName(appName))} ${APP_VERSION}</div>
 
     <div class="options-apply">
-      <button class="primary-btn" onclick="saveProfileAndEnter()">Appliquer</button>
+      <button class="primary-btn" data-action="save-profile">Appliquer</button>
     </div>
   `;
   updateSpotifyUI();
@@ -3188,13 +3070,20 @@ function profilePillHTML(){
   return '<span class="profile-avatar" aria-hidden="true"></span><span class="profile-copy"><strong>'+escapeHTML(label)+'</strong><em>'+escapeHTML(sub)+'</em></span>';
 }
 
-function renderAllImpl(){applyTimerColor();updateSessionRunner();if(typeof renderEquipment==='function')renderEquipment();if(typeof renderStats==='function')renderStats();renderTimerDaySelect();renderChoices();renderDays();renderInfo();renderExercises();renderExerciseLibrary();renderWeek();renderTimerFinishPanel();const pill=document.getElementById('profile-pill');if(pill)pill.innerHTML=profilePillHTML();document.getElementById('tip-mode').textContent=timerModeLabel ? timerModeLabel() : profilePillLabel()}
+function renderAllImpl(){applyTimerColor();updateSessionRunner();if(typeof renderEquipment==='function')renderEquipment();if(typeof renderStats==='function')renderStats();if(typeof renderWeeklyPlan==='function')renderWeeklyPlan();renderTimerDaySelect();renderChoices();renderDays();renderInfo();renderExercises();renderExerciseLibrary();renderWeek();renderTimerFinishPanel();const pill=document.getElementById('profile-pill');if(pill)pill.innerHTML=profilePillHTML();document.getElementById('tip-mode').textContent=timerModeLabel ? timerModeLabel() : profilePillLabel()}
 
 // Wrapper with memoization to prevent duplicate renders
 function renderAll() {
   renderAllImpl();
 }
-function renderDays(){document.getElementById('day-scroller').innerHTML=DAYS.map(d=>`<button class="day-chip ${d===currentDay?'active':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);renderAll()">${d}</button>`).join('')}
+function selectProgramDay(day,options={}){
+  if(!DAYS.includes(day))return;
+  currentDay=day;
+  storageSafe.setItem('vv-current-day',currentDay);
+  if(options.week)showProgramView('today',{keepDay:true});
+  renderAll();
+}
+function renderDays(){document.getElementById('day-scroller').innerHTML=DAYS.map(d=>`<button class="day-chip ${d===currentDay?'active':''}" data-action="select-day" data-day="${d}">${d}</button>`).join('')}
 
 let guidedSession=null;
 let customSessionSelection=[];
@@ -3371,7 +3260,7 @@ function programHeroHTML(){
     '<div class="program-hero-meter"><b>'+info.pct+'%</b><small>'+info.done+'/'+info.total+' exercices</small></div>'+
     '<div class="program-hero-progress"><div style="width:'+info.pct+'%"></div></div>'+
     '<div class="program-hero-next">'+(next?'Prochain : '+escapeHTML(next.name):'Séance terminée')+'</div>'+
-    '<button class="program-main-action" type="button" '+(info.pct>=100?'disabled':'onclick="startTodaySession()"')+'>'+(info.pct>=100?'Séance terminée':buttonLabel)+'</button>'+
+    '<button class="program-main-action" type="button" '+(info.pct>=100?'disabled':'data-action="start-today-session"')+'>'+(info.pct>=100?'Séance terminée':buttonLabel)+'</button>'+
     (info.pct>=100?sessionFeedbackHTML():'')+
   '</div>';
 }
@@ -3386,7 +3275,7 @@ function sessionFeedbackHTML(){
     ['pain','Douleur']
   ];
   return '<div class="session-feedback"><div class="session-feedback-title">Ressenti de séance</div><div class="session-feedback-grid">'+
-    items.map(([value,label])=>'<button type="button" class="'+(selected===value?'active':'')+'" onclick="saveSessionFeedback(\''+value+'\')">'+label+'</button>').join('')+
+    items.map(([value,label])=>'<button type="button" class="'+(selected===value?'active':'')+'" data-action="save-feedback" data-value="'+value+'">'+label+'</button>').join('')+
   '</div><div class="session-feedback-note">'+(selected?'Pris en compte pour adapter la suite.':'Ton choix adapte les prochaines séances Perso.')+'</div></div>';
 }
 
@@ -3400,7 +3289,7 @@ function sessionFeedbackButtonsHTML(day=currentDay){
     ['pain','Douleur']
   ];
   return '<div class="session-feedback-grid">'+
-    items.map(([value,label])=>'<button type="button" class="'+(selected===value?'active':'')+'" onclick="saveSessionFeedback(\''+value+'\',\''+day+'\')">'+label+'</button>').join('')+
+    items.map(([value,label])=>'<button type="button" class="'+(selected===value?'active':'')+'" data-action="save-feedback" data-value="'+value+'" data-day="'+day+'">'+label+'</button>').join('')+
   '</div>';
 }
 
@@ -3423,7 +3312,7 @@ function renderTimerFinishPanel(){
       sessionFeedbackButtonsHTML(day)+
       '<small>'+(fb?'Pris en compte pour les prochaines séances.':'Le coach adapte ensuite volume, repos et difficulté.')+'</small>'+
     '</div>'+
-    '<button class="timer-finish-link" type="button" onclick="showTab(\'today\')">Voir mon programme</button>';
+    '<button class="timer-finish-link" type="button" data-action="show-today">Voir mon programme</button>';
 }
 
 function startTodaySession(){
@@ -3577,7 +3466,7 @@ function todayNextExerciseText(){
   if(p.total===0)return 'Aucun exercice prévu';
   if(p.complete)return 'Tous les exercices sont terminés';
   const next=P()[currentDay].exercises[p.nextIndex];
-  return next ? 'Prochain exercice : '+next.name : 'Prochain exercice : —';
+  return next ? 'Prochain exercice : '+next.name : 'Prochain exercice : –';
 }
 
 function updateSessionRunner(){
@@ -3595,7 +3484,7 @@ function updateSessionRunner(){
         <strong>${current}/${total}</strong>
       </div>
       <div class="session-next">${step?'En cours : '+escapeHTML(step.name):'Séance personnalisée prête.'}</div>
-      <button class="session-runner-stop" type="button" onclick="stopGuidedSession()">Arrêter la séance</button>
+      <button class="session-runner-stop" type="button" data-action="stop-guided-session">Arrêter la séance</button>
     `;
     return;
   }
@@ -3633,7 +3522,7 @@ function updateSessionRunner(){
       <strong>${p.done}/${p.total} · ${Math.round((p.done/p.total)*100)}%</strong>
     </div>
     <div class="session-next">${todayNextExerciseText()}</div>
-    <button class="primary-btn" onclick="startTodaySession()">${p.done>0?'Reprendre ma séance':'Démarrer ma séance du jour'}</button>
+    <button class="primary-btn" data-action="start-today-session">${p.done>0?'Reprendre ma séance':'Démarrer ma séance du jour'}</button>
   `;
 }
 
@@ -3659,7 +3548,7 @@ function sessionPlanHTML(){
     '<div class="session-plan-title"><span>Plan du jour</span><strong>'+remaining+' restant · ~'+estimatedMinutes+' min</strong></div>'+
     shown.map((ex,i)=>'<div class="session-plan-item">'+
       '<span>'+(i+1)+'. '+ex.name+'</span>'+
-      '<em>'+(ex.circuit?'circuit':(ex.effort?fmt(ex.effort):'—'))+'</em>'+
+      '<em>'+(ex.circuit?'circuit':(ex.effort?fmt(ex.effort):'–'))+'</em>'+
     '</div>').join('')+
   '</div>';
 }
@@ -3679,7 +3568,7 @@ function sessionStatusHTML(){
     '</div>';
   }
 
-  const next=info.nextExercise ? info.nextExercise.name : '—';
+  const next=info.nextExercise ? info.nextExercise.name : '–';
   if(String(next).toLowerCase().includes('séance terminée') || String(next).toLowerCase().includes('seance terminee')){
     return '<div class="session-status session-complete">'+
       '<div class="session-status-title"><span>Avancement</span><strong>'+info.total+'/'+info.total+' · 100%</strong></div>'+
@@ -3702,7 +3591,7 @@ function renderInfo(){
     return;
   }
   document.getElementById('day-info-card').innerHTML=
-    `<div class="card day-detail-card"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" onclick="resetDay()">Reset</button></div><div class="prog-row"><span class="prog-label">Progression</span><span class="prog-pct">${progress}%</span></div><div class="prog-track"><div class="prog-fill" style="width:${progress}%"></div></div>${sessionStatusHTML()}<button class="primary-btn day-session-action" ${progress>=100?'disabled':'onclick="startTodaySession()"'}>${progress>=100?'Séance terminée':(progress>0?'Reprendre ma séance':'Démarrer ma séance')}</button>${sessionPlanHTML()}</div>`;
+    `<div class="card day-detail-card"><div class="card-info"><div><div class="day-name">${currentDay}${currentDay===getRealDay()?' · Aujourd’hui':''}</div><div class="day-title">${p.title} · ${p.duration}</div><div class="warmup">Échauffement : ${p.warmup}</div></div><button class="reset-btn" data-action="reset-day">Reset</button></div><div class="prog-row"><span class="prog-label">Progression</span><span class="prog-pct">${progress}%</span></div><div class="prog-track"><div class="prog-fill" style="width:${progress}%"></div></div>${sessionStatusHTML()}<button class="primary-btn day-session-action" ${progress>=100?'disabled':'data-action="start-today-session"'}>${progress>=100?'Séance terminée':(progress>0?'Reprendre ma séance':'Démarrer ma séance')}</button>${sessionPlanHTML()}</div>`;
 }
 
 function circuitHTML(ex){
@@ -3728,13 +3617,13 @@ function renderExercises(){
     const visualKey=chooseExerciseVisual(ex);
     const visual=SVGS[visualKey]||SVGS[ex.svg]||SVGS.default;
     const checkLabel=ex.type==='repos'?'Valider le repos':'Valider l’exercice';
-    return `<div class="ex-card ${ex.type==='repos'?'rest-card':''} ${getDone(ex)?'done':''}" onclick="toggleCard(this)"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" onclick="event.preventDefault();event.stopPropagation();startExerciseTimer('${currentDay}',${i})">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" onclick="return handleCheckClick(event,'${currentDay}',${i})">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div>${exerciseMetaHTML(ex)}${tutorialLinkHTML(ex)}${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." onclick="event.stopPropagation()" oninput="setNote(P()[currentDay].exercises[${i}],this.value)">${getNote(ex)}</textarea></div></div>`;
+    return `<div class="ex-card ${ex.type==='repos'?'rest-card':''} ${getDone(ex)?'done':''}" data-action="toggle-card"><div class="ex-header"><div class="ex-title-block"><div class="ex-name">${ex.name}</div><div class="ex-sets">${ex.sets}</div></div><div class="ex-actions"><svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7l5 5 5-5"/></svg>${ex.type==='repos'?'':`<button type="button" class="mini-timer-btn ${timer.exercise===ex.name&&timer.running?'active':''}" data-exercise="${ex.name}" title="Démarrer l’exercice" aria-label="Démarrer l’exercice" data-action="start-exercise" data-day="${currentDay}" data-index="${i}">▶</button>`}<button type="button" class="check-btn ${getDone(ex)?'done':''}" title="${checkLabel}" aria-label="${checkLabel}" data-action="check-exercise" data-day="${currentDay}" data-index="${i}">✓</button></div></div><div class="ex-body"><div class="ex-visual" data-visual="${visualKey}">${visual}</div>${exerciseMetaHTML(ex)}${tutorialLinkHTML(ex)}${ex.type==='repos'?'':`<div class="ex-timer-line">${ex.circuit?'Circuit guidé · '+ex.circuit.length+' étapes':'Effort '+fmt(ex.effort)+' · Récupération '+fmt(ex.rest)}</div>`}${circuitHTML(ex)}<textarea class="ex-note" placeholder="Note personnelle..." data-action="exercise-note" data-day="${currentDay}" data-index="${i}">${getNote(ex)}</textarea></div></div>`;
   }).join('');
 }
 
 function exerciseMetaHTML(ex){
   const rows=[
-    ['Cible',ex.target||'—'],
+    ['Cible',ex.target||'–'],
     ['Faire',ex.how||'Fais le mouvement avec contrôle.'],
     ['Conseil',ex.tips||'Garde une technique propre.']
   ];
@@ -3805,18 +3694,18 @@ function exerciseCardHTML(item,libraryIndex){
   const sourceLabel=item.source==='programme' ? item.day+' · programme' : 'Bibliothèque · exercice seul';
   const selected=customSessionSelection.includes(item.key||libraryItemKey(item));
   const sessionKey=item.key||libraryItemKey(item);
-  return `<div class="ex-card library-ex-card ${selected?'session-selected':''}" data-session-key="${escapeHTML(sessionKey)}" onclick="toggleCard(this)">
+  return `<div class="ex-card library-ex-card ${selected?'session-selected':''}" data-session-key="${escapeHTML(sessionKey)}" data-action="toggle-card">
     <div class="ex-header">
       <div class="library-title-row">
         <div class="ex-title-block">
           <div class="ex-name">${ex.name}</div>
           <div class="ex-sets">${ex.sets||sourceLabel}</div>
           <div class="exercise-source">${sourceLabel}</div>
-          <button type="button" class="select-session-btn ${selected?'active':''}" data-session-key="${escapeHTML(sessionKey)}" title="${selected?'Retirer de la séance':'Ajouter à la séance'}" aria-label="${selected?'Retirer de la séance':'Ajouter à la séance'}" aria-pressed="${selected?'true':'false'}" onclick="event.preventDefault();event.stopPropagation();toggleCustomSessionItem(${libraryIndex})">${selected?'Ajouté':' + Séance'}</button>
+          <button type="button" class="select-session-btn ${selected?'active':''}" data-session-key="${escapeHTML(sessionKey)}" title="${selected?'Retirer de la séance':'Ajouter à la séance'}" aria-label="${selected?'Retirer de la séance':'Ajouter à la séance'}" aria-pressed="${selected?'true':'false'}" data-action="toggle-custom-session" data-index="${libraryIndex}">${selected?'Ajouté':' + Séance'}</button>
         </div>
       </div>
       <div class="ex-actions">
-        <button type="button" class="mini-timer-btn" title="Lancer l’exercice" aria-label="Lancer l’exercice" onclick="event.preventDefault();event.stopPropagation();startLibraryExercise(${libraryIndex})">▶</button>
+        <button type="button" class="mini-timer-btn" title="Lancer l’exercice" aria-label="Lancer l’exercice" data-action="start-library-exercise" data-index="${libraryIndex}">▶</button>
         <svg class="ex-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M5 7l5 5 5-5"/></svg>
       </div>
     </div>
@@ -3856,9 +3745,9 @@ function renderCustomSessionBuilder(){
       '<div class="saved-session-item">'+
         '<div><strong>'+escapeHTML(session.name||('Séance '+(index+1)))+'</strong><span>'+((session.keys&&session.keys.length)||0)+' exercices · ~'+customSessionMinutesFromKeys(session.keys||[])+' min</span></div>'+
         '<div class="saved-session-actions">'+
-          '<button type="button" onclick="loadSavedCustomSession('+index+')">Charger</button>'+
-          '<button type="button" onclick="startSavedCustomSession('+index+')">Lancer</button>'+
-          '<button type="button" aria-label="Supprimer '+escapeHTML(session.name||'cette séance')+'" onclick="deleteSavedCustomSession('+index+')">×</button>'+
+          '<button type="button" data-action="load-saved-session" data-index="'+index+'">Charger</button>'+
+          '<button type="button" data-action="start-saved-session" data-index="'+index+'">Lancer</button>'+
+          '<button type="button" aria-label="Supprimer '+escapeHTML(session.name||'cette séance')+'" data-action="delete-saved-session" data-index="'+index+'">×</button>'+
         '</div>'+
       '</div>'
     ).join('')+
@@ -3872,15 +3761,15 @@ function renderCustomSessionBuilder(){
 
   box.classList.add('has-items');
   box.innerHTML=
-    '<div class="custom-session-head"><div><span>Séance personnalisée</span><strong>'+items.length+' exercice'+(items.length>1?'s':'')+' · ~'+customSessionMinutes(items)+' min</strong></div><button type="button" onclick="clearCustomSession()">Vider</button></div>'+
+    '<div class="custom-session-head"><div><span>Séance personnalisée</span><strong>'+items.length+' exercice'+(items.length>1?'s':'')+' · ~'+customSessionMinutes(items)+' min</strong></div><button type="button" data-action="clear-custom-session">Vider</button></div>'+
     '<div class="custom-session-list">'+items.map((item,index)=>
-      '<div class="custom-session-item"><span>'+(index+1)+'. '+escapeHTML(item.ex.name)+'</span><button type="button" aria-label="Retirer '+escapeHTML(item.ex.name)+'" onclick="removeCustomSessionItem('+index+')">×</button></div>'
+      '<div class="custom-session-item"><span>'+(index+1)+'. '+escapeHTML(item.ex.name)+'</span><button type="button" aria-label="Retirer '+escapeHTML(item.ex.name)+'" data-action="remove-custom-session" data-index="'+index+'">×</button></div>'
     ).join('')+'</div>'+
     '<div class="custom-session-save-row">'+
       '<input id="custom-session-name" type="text" maxlength="32" placeholder="Nom de la séance" value="'+escapeHTML(defaultCustomSessionName())+'">'+
-      '<button type="button" onclick="saveCurrentCustomSession()">Sauver</button>'+
+      '<button type="button" data-action="save-custom-session">Sauver</button>'+
     '</div>'+
-    '<button class="custom-session-start" type="button" onclick="startCustomSession()">Lancer ma séance perso</button>'+
+    '<button class="custom-session-start" type="button" data-action="start-custom-session">Lancer ma séance perso</button>'+
     savedHTML;
 }
 
@@ -3975,7 +3864,7 @@ function renderExerciseProfileQuick(){
       class="profile-chip ${isActive?'active is-active':''}"
       data-level="${k}"
       aria-pressed="${isActive?'true':'false'}"
-      onclick="selectExerciseLevel('${k}')">${v.label}</button>
+      data-action="select-exercise-level">${v.label}</button>
   `;
   }).join('');
 }
@@ -4079,9 +3968,673 @@ function resetWeek(){
   renderAll();
   saveAppState();
 }
-function renderWeek(){const grid=document.getElementById('week-grid');if(!grid)return;grid.innerHTML=DAYS.map(d=>{const p=pct(d);return `<div class="week-card ${d===currentDay?'today':''}" onclick="currentDay='${d}';storageSafe.setItem('vv-current-day',currentDay);showProgramView('today',{keepDay:true});renderAll()"><div class="wday">${d}</div><div class="wtitle">${P()[d].title}</div><div class="wpct ${p===100?'full':''}">${p}%</div><div class="week-prog-track"><div class="week-prog-fill" style="width:${p}%"></div></div><span class="badge ${p===100?'badge-done':p>0?'badge-partial':'badge-rest'}">${p===100?'fait':p>0?'en cours':'à faire'}</span></div>`}).join('')}
+function renderWeek(){const grid=document.getElementById('week-grid');if(!grid)return;grid.innerHTML=DAYS.map(d=>{const p=pct(d);return `<div class="week-card ${d===currentDay?'today':''}" data-action="week-day" data-day="${d}"><div class="wday">${d}</div><div class="wtitle">${P()[d].title}</div><div class="wpct ${p===100?'full':''}">${p}%</div><div class="week-prog-track"><div class="week-prog-fill" style="width:${p}%"></div></div><span class="badge ${p===100?'badge-done':p>0?'badge-partial':'badge-rest'}">${p===100?'fait':p>0?'en cours':'à faire'}</span></div>`}).join('')}
 
-function bindNavigationTabs(){
+
+const WEEKLY_PLAN_KEY='vv-weekly-plan-v1';
+const SAVED_WEEKLY_PLANS_KEY='vv-saved-weekly-plans-v1';
+const WEEKLY_PLAN_TYPES={
+  rest:'Repos',
+  routine:'Routine',
+  session:'Séance',
+  exercise:'Exercice libre'
+};
+let weeklyPlanEditing=false;
+let weeklyPlan=loadWeeklyPlan();
+let selectedSavedWeeklyPlanId='';
+Object.defineProperty(window,'selectedSavedWeeklyPlanId',{get(){return selectedSavedWeeklyPlanId;}});
+
+function defaultWeeklyPlan(template='current'){
+  const plan={version:1,template,days:{}};
+  const sportDays=template==='3days'?3:(template==='4days'?4:Math.max(1,DAYS.filter(day=>!isRestProgramDay(day)).length));
+  const routineDays=template==='3days'
+    ? planDaysForCount(3)
+    : (template==='4days'?planDaysForCount(4):DAYS.filter(day=>!isRestProgramDay(day)));
+  plan.sportDays=sportDays;
+  DAYS.forEach(day=>{
+    const routine=routineDays.includes(day);
+    plan.days[day]={type:routine?'routine':'rest',routineDay:day,sessionId:'',exerciseKey:''};
+  });
+  return plan;
+}
+
+function planDaysForCount(count){
+  const presets={
+    1:['Mercredi'],
+    2:['Mardi','Vendredi'],
+    3:['Lundi','Mercredi','Vendredi'],
+    4:['Lundi','Mardi','Jeudi','Samedi'],
+    5:['Lundi','Mardi','Mercredi','Vendredi','Samedi'],
+    6:['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi']
+  };
+  return presets[Math.max(1,Math.min(6,Number(count)||3))] || presets[3];
+}
+
+function normalizeWeeklyPlan(plan){
+  const fallback=defaultWeeklyPlan('current');
+  const next={...fallback,...(plan||{})};
+  next.days={...fallback.days,...(plan&&plan.days?plan.days:{})};
+  next.sportDays=Math.max(1,Math.min(6,Number(next.sportDays)||DAYS.filter(day=>next.days[day]&&next.days[day].type!=='rest').length||3));
+  DAYS.forEach(day=>{
+    next.days[day]={type:'routine',routineDay:day,sessionId:'',exerciseKey:'',customName:'',customKeys:[],customExerciseNames:{},...(next.days[day]||{})};
+    if(!WEEKLY_PLAN_TYPES[next.days[day].type])next.days[day].type='routine';
+    if(!DAYS.includes(next.days[day].routineDay))next.days[day].routineDay=day;
+    if(!Array.isArray(next.days[day].customKeys))next.days[day].customKeys=[];
+    if(!next.days[day].customExerciseNames||typeof next.days[day].customExerciseNames!=='object')next.days[day].customExerciseNames={};
+  });
+  return next;
+}
+
+function loadWeeklyPlan(){
+  try{return normalizeWeeklyPlan(JSON.parse(storageSafe.getItem(WEEKLY_PLAN_KEY)||'null'));}
+  catch(e){return defaultWeeklyPlan('current');}
+}
+
+function saveWeeklyPlan(){
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  storageSafe.setItem(WEEKLY_PLAN_KEY,JSON.stringify(weeklyPlan));
+}
+
+function loadSavedWeeklyPlans(){
+  try{
+    const plans=JSON.parse(storageSafe.getItem(SAVED_WEEKLY_PLANS_KEY)||'[]');
+    return Array.isArray(plans)?plans:[];
+  }catch(e){return [];}
+}
+
+function saveSavedWeeklyPlans(plans){
+  storageSafe.setItem(SAVED_WEEKLY_PLANS_KEY,JSON.stringify((plans||[]).slice(0,8)));
+}
+
+function savedWeeklyPlanOptions(){
+  const plans=loadSavedWeeklyPlans();
+  if(!plans.length)return '<option value="">Aucun plan sauvegardé</option>';
+  return '<option value="">Charger un plan...</option>'+plans.map(plan=>
+    '<option value="'+escapeHTML(plan.id)+'" '+(plan.id===selectedSavedWeeklyPlanId?'selected':'')+'>'+escapeHTML(plan.name||'Plan sauvegardé')+'</option>'
+  ).join('');
+}
+
+function saveCurrentWeeklyPlanSnapshot(){
+  saveWeeklyPlan();
+  const plans=loadSavedWeeklyPlans().filter(plan=>plan&&plan.plan);
+  const stamp=new Date();
+  const name=(weeklyPlan.sportDays||weeklyPlanSelectedSportDays().length)+' jour'+((weeklyPlan.sportDays||0)>1?'s':'')+' · '+stamp.toLocaleDateString('fr-FR');
+  plans.unshift({id:String(Date.now()),name,createdAt:stamp.toISOString(),plan:normalizeWeeklyPlan(weeklyPlan)});
+  selectedSavedWeeklyPlanId=plans[0].id;
+  saveSavedWeeklyPlans(plans);
+  weeklyPlanEditing=false;
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function loadWeeklyPlanSnapshot(id){
+  const found=loadSavedWeeklyPlans().find(plan=>plan.id===id);
+  if(!found||!found.plan)return;
+  selectedSavedWeeklyPlanId=id;
+  weeklyPlan=normalizeWeeklyPlan(found.plan);
+  saveWeeklyPlan();
+  weeklyPlanEditing=false;
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function deleteWeeklyPlanSnapshot(){
+  if(!selectedSavedWeeklyPlanId)return;
+  const plans=loadSavedWeeklyPlans().filter(plan=>plan.id!==selectedSavedWeeklyPlanId);
+  selectedSavedWeeklyPlanId='';
+  saveSavedWeeklyPlans(plans);
+  renderWeeklyPlan();
+}
+
+function weeklyPlanEntry(day){
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  return weeklyPlan.days[day]||defaultWeeklyPlan('current').days[day];
+}
+
+function weeklyPlanExerciseMap(){
+  return new Map(getExerciseLibraryItems().map(item=>[item.key||libraryItemKey(item),item]));
+}
+
+function weeklyPlanCustomItems(day,entry=weeklyPlanEntry(day)){
+  const map=weeklyPlanExerciseMap();
+  const names=(entry&&entry.customExerciseNames)||{};
+  return ((entry&&entry.customKeys)||[]).map(key=>{
+    const item=map.get(key);
+    if(!item)return null;
+    return {key,item,name:names[key]||item.ex.name};
+  }).filter(Boolean);
+}
+
+function weeklyPlanCustomRoutineName(day,entry=weeklyPlanEntry(day)){
+  return (entry&&entry.customName&&entry.customName.trim()) || ('Routine '+day);
+}
+
+function weeklyPlanCustomRoutineSteps(day,entry=weeklyPlanEntry(day)){
+  return weeklyPlanCustomItems(day,entry).flatMap(selected=>{
+    const label=selected.name||selected.item.ex.name;
+    return exerciseToCustomSteps(selected.item).map(step=>({
+      ...step,
+      source:label,
+      name:step.name===selected.item.ex.name ? label : step.name,
+      original:{...(step.original||selected.item.ex),name:label}
+    }));
+  }).filter(step=>step.effort>0);
+}
+
+function weeklyPlanExerciseOptions(selectedKey){
+  const items=getExerciseLibraryItems();
+  if(!items.length)return '<option value="">Aucun exercice disponible</option>';
+  return items.slice(0,80).map(item=>{
+    const key=item.key||libraryItemKey(item);
+    const ex=item.ex||{};
+    return '<option value="'+escapeHTML(key)+'" '+(key===selectedKey?'selected':'')+'>'+escapeHTML(ex.name||'Exercice')+'</option>';
+  }).join('');
+}
+
+function weeklyPlanSessionOptions(selectedId){
+  if(!savedCustomSessions.length)return '<option value="">Aucune séance sauvegardée</option>';
+  return savedCustomSessions.map((session,index)=>{
+    const id=session.id||String(index);
+    return '<option value="'+escapeHTML(id)+'" '+(id===selectedId?'selected':'')+'>'+escapeHTML(session.name||('Séance '+(index+1)))+'</option>';
+  }).join('');
+}
+
+function weeklyPlanTypeOptions(selectedType){
+  return Object.entries(WEEKLY_PLAN_TYPES).map(([value,label])=>
+    '<option value="'+value+'" '+(value===selectedType?'selected':'')+'>'+label+'</option>'
+  ).join('');
+}
+
+function weeklyPlanSportTypeOptions(selectedType){
+  return Object.entries(WEEKLY_PLAN_TYPES).filter(([value])=>value!=='rest').map(([value,label])=>
+    '<option value="'+value+'" '+(value===selectedType?'selected':'')+'>'+label+'</option>'
+  ).join('');
+}
+
+function weeklyPlanRoutineOptions(selectedDay){
+  return DAYS.map(day=>
+    '<option value="'+day+'" '+(day===selectedDay?'selected':'')+'>'+day+' - '+escapeHTML((P()[day]&&P()[day].title)||'Routine')+'</option>'
+  ).join('');
+}
+
+function weeklyPlanSportDaysOptions(selectedCount){
+  return [1,2,3,4,5,6].map(count=>
+    '<option value="'+count+'" '+(Number(selectedCount)===count?'selected':'')+'>'+count+' jour'+(count>1?'s':'')+' de sport</option>'
+  ).join('');
+}
+
+function weeklyPlanSelectedSportDays(){
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const desired=Math.max(1,Math.min(6,Number(weeklyPlan.sportDays)||3));
+  const selected=DAYS.filter(day=>weeklyPlanEntry(day).type!=='rest').slice(0,desired);
+  planDaysForCount(desired).forEach(day=>{
+    if(selected.length<desired&&!selected.includes(day))selected.push(day);
+  });
+  DAYS.forEach(day=>{
+    if(selected.length<desired&&!selected.includes(day))selected.push(day);
+  });
+  return selected.slice(0,desired);
+}
+
+function weeklyPlanDayOptions(selectedDay,selectedDays){
+  return DAYS.map(day=>{
+    const disabled=selectedDays.includes(day)&&day!==selectedDay;
+    return '<option value="'+day+'" '+(day===selectedDay?'selected':'')+' '+(disabled?'disabled':'')+'>'+day+'</option>';
+  }).join('');
+}
+
+function weeklyPlanDuplicateOptions(day){
+  return '<option value="">Copier une journée...</option>'+DAYS.filter(d=>d!==day).map(d=>
+    '<option value="'+d+'">'+d+' - '+escapeHTML(WEEKLY_PLAN_TYPES[weeklyPlanEntry(d).type]||'Plan')+'</option>'
+  ).join('');
+}
+
+function weeklyPlanEntryMinutes(day,entry){
+  if(entry.type==='rest')return 0;
+  if(entry.type==='routine'){
+    const customItems=weeklyPlanCustomItems(day,entry);
+    return customItems.length ? customSessionMinutes(customItems.map(x=>x.item)) : estimatedDayMinutes(entry.routineDay||day);
+  }
+  if(entry.type==='session'){
+    const session=savedCustomSessions.find((s,index)=>(s.id||String(index))===entry.sessionId);
+    return session ? customSessionMinutesFromKeys(session.keys||[]) : 0;
+  }
+  if(entry.type==='exercise'){
+    const item=getExerciseLibraryItems().find(x=>(x.key||libraryItemKey(x))===entry.exerciseKey);
+    const ex=item&&item.ex;
+    return ex ? Math.max(1,Math.round(((ex.effort||60)+(ex.rest||0))/60)) : 0;
+  }
+  return 0;
+}
+
+function weeklyPlanLoadSummary(){
+  const entries=DAYS.map(day=>({day,entry:weeklyPlanEntry(day)}));
+  const workouts=entries.filter(x=>x.entry.type!=='rest');
+  const minutes=entries.reduce((sum,x)=>sum+weeklyPlanEntryMinutes(x.day,x.entry),0);
+  const rest=entries.length-workouts.length;
+  const busiest=entries.reduce((best,x)=>{
+    const mins=weeklyPlanEntryMinutes(x.day,x.entry);
+    return mins>(best.minutes||0)?{day:x.day,minutes:mins}:best;
+  },{day:'',minutes:0});
+  return {workouts:workouts.length,rest,minutes,busiest};
+}
+
+function weeklyPlanSummary(day,entry){
+  if(entry.type==='rest')return 'Repos prévu';
+  if(entry.type==='routine'){
+    const customItems=weeklyPlanCustomItems(day,entry);
+    if(customItems.length)return weeklyPlanCustomRoutineName(day,entry)+' · '+customItems.length+' exo'+(customItems.length>1?'s':'');
+    const source=entry.routineDay||day;
+    const p=P()[source];
+    return 'Routine '+source+' · '+(p&&p.title?p.title:'programme');
+  }
+  if(entry.type==='session'){
+    const session=savedCustomSessions.find((s,index)=>(s.id||String(index))===entry.sessionId);
+    return session ? 'Séance sauvegardée · '+(session.name||'Sans nom') : 'Séance sauvegardée à choisir';
+  }
+  if(entry.type==='exercise'){
+    const item=getExerciseLibraryItems().find(x=>(x.key||libraryItemKey(x))===entry.exerciseKey);
+    return item ? 'Exercice libre · '+item.ex.name : 'Exercice libre à choisir';
+  }
+  return 'Plan à définir';
+}
+
+function weeklyPlanEditFields(day,entry){
+  const type=entry.type;
+  const createSessionLink='<button type="button" class="plan-inline-action" data-action="create-plan-routine">Créer / programmer une séance</button>';
+  const detail=type==='routine'
+    ? '<label>Base programme<select data-action="plan-field" data-day="'+day+'" data-field="routineDay">'+weeklyPlanRoutineOptions(entry.routineDay||day)+'</select></label>'+weeklyPlanRoutineBuilderHTML(day,entry)
+    : (type==='session'
+      ? '<label>Séance sauvegardée<select data-action="plan-field" data-day="'+day+'" data-field="sessionId">'+weeklyPlanSessionOptions(entry.sessionId)+'</select></label>'+createSessionLink
+      : (type==='exercise'
+        ? '<label>Exercice de la bibliothèque<select data-action="plan-field" data-day="'+day+'" data-field="exerciseKey">'+weeklyPlanExerciseOptions(entry.exerciseKey)+'</select></label>'
+        : '<div class="plan-rest-note">Repos actif ou vraie coupure. Rien ne sera compté dans les exercices.</div>'));
+  return '<div class="plan-edit-grid">'+
+    '<label>Quoi faire ce jour<select data-action="plan-field" data-day="'+day+'" data-field="type">'+weeklyPlanTypeOptions(type)+'</select></label>'+
+    detail+
+  '</div>';
+}
+
+function weeklyPlanRoutineBuilderHTML(day,entry){
+  const selected=weeklyPlanCustomItems(day,entry);
+  const selectedKeys=new Set(((entry&&entry.customKeys)||[]));
+  const items=getExerciseLibraryItems().map((item,index)=>({...item,libraryIndex:index}));
+  const selectedHTML=selected.length
+    ? '<div class="plan-routine-list">'+selected.map((selectedItem,index)=>
+        '<div class="plan-routine-item">'+
+          '<span>'+(index+1)+'</span>'+
+          '<input type="text" maxlength="42" value="'+escapeHTML(selectedItem.name)+'" data-action="plan-routine-ex-name" data-day="'+day+'" data-key="'+escapeHTML(selectedItem.key)+'" aria-label="Renommer '+escapeHTML(selectedItem.name)+'">'+
+          '<div class="plan-routine-item-actions">'+
+            '<button type="button" data-action="move-plan-routine-exercise" data-day="'+day+'" data-index="'+index+'" data-dir="-1" aria-label="Monter">↑</button>'+
+            '<button type="button" data-action="move-plan-routine-exercise" data-day="'+day+'" data-index="'+index+'" data-dir="1" aria-label="Descendre">↓</button>'+
+            '<button type="button" data-action="remove-plan-routine-exercise" data-day="'+day+'" data-index="'+index+'" aria-label="Retirer">×</button>'+
+          '</div>'+
+        '</div>'
+      ).join('')+'</div>'
+    : '<div class="plan-routine-empty">Ajoute des exercices pour créer une routine propre à ce jour. Sinon la base programme sera utilisée.</div>';
+  const shopHTML=EXERCISE_THEME_ORDER.map(theme=>{
+    const group=items.filter(item=>item.theme===theme);
+    if(!group.length)return '';
+    return '<details class="plan-shop-theme">'+
+      '<summary><span>'+EXERCISE_THEME_LABELS[theme]+'</span><strong>'+group.length+'</strong></summary>'+
+      '<div class="plan-shop-list">'+group.map(item=>{
+        const key=item.key||libraryItemKey(item);
+        const added=selectedKeys.has(key);
+        return '<button type="button" class="plan-shop-item '+(added?'active':'')+'" data-action="add-plan-routine-exercise" data-day="'+day+'" data-index="'+item.libraryIndex+'" '+(added?'disabled':'')+'>'+
+          '<span><b>'+escapeHTML(item.ex.name)+'</b><em>'+escapeHTML(item.ex.sets||item.ex.target||'Exercice')+'</em></span>'+
+          '<strong>'+(added?'Ajouté':'+')+'</strong>'+
+        '</button>';
+      }).join('')+'</div>'+
+    '</details>';
+  }).join('');
+  return '<div class="plan-routine-builder">'+
+    '<label>Nom de la routine<input type="text" maxlength="36" value="'+escapeHTML(weeklyPlanCustomRoutineName(day,entry))+'" data-action="plan-routine-field" data-day="'+day+'" data-field="customName"></label>'+
+    '<div class="plan-routine-head"><span>Routine du jour</span><strong>'+selected.length+' exercice'+(selected.length>1?'s':'')+'</strong></div>'+
+    selectedHTML+
+    '<details class="plan-routine-shop">'+
+      '<summary><span>Ajouter des exercices</span><strong>Boutique</strong></summary>'+
+      shopHTML+
+    '</details>'+
+  '</div>';
+}
+
+function renderWeeklyPlan(){
+  const box=document.getElementById('weekly-plan-content');
+  if(!box)return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const today=getRealDay();
+  const load=weeklyPlanLoadSummary();
+  const selectedDays=weeklyPlanSelectedSportDays();
+  const savedPlans=loadSavedWeeklyPlans();
+  const canDeleteSavedPlan=Boolean(selectedSavedWeeklyPlanId&&savedPlans.some(plan=>plan.id===selectedSavedWeeklyPlanId));
+  const levelLabel=(profile.level&&LEVELS[profile.level]) ? LEVELS[profile.level].label : 'Profil à choisir';
+  const planTitle=(weeklyPlan.sportDays||selectedDays.length)+' jour'+((weeklyPlan.sportDays||selectedDays.length)>1?'s':'')+' de sport';
+  const calendarPreview=DAYS.map(day=>{
+    const entry=weeklyPlanEntry(day);
+    const active=entry.type!=='rest';
+    const minutes=weeklyPlanEntryMinutes(day,entry);
+    const title=active ? (WEEKLY_PLAN_TYPES[entry.type]||'Sport') : 'Repos';
+    const summary=entry.type==='rest'
+      ? 'Journée libre'
+      : (entry.type==='routine'
+        ? escapeHTML(((P()[entry.routineDay||day]||{}).title)||'Programme')
+        : escapeHTML(weeklyPlanSummary(day,entry).replace(/^Exercice libre · /,'').replace(/^Séance sauvegardée · /,'')));
+    const head='<div class="plan-calendar-date"><strong>'+day.slice(0,3)+'</strong></div>'+
+      '<div class="plan-calendar-event"><b>'+escapeHTML(title)+'</b><small>'+summary+'</small></div>'+
+      '<div class="plan-calendar-meta">'+(minutes?'~'+minutes+' min':'Repos')+'</div>';
+    if(weeklyPlanEditing){
+      return '<details class="plan-calendar-day plan-calendar-drop '+(active?'active':'rest')+' '+(day===today?'today':'')+'">'+
+        '<summary class="plan-calendar-summary">'+head+'</summary>'+
+        '<div class="plan-calendar-edit">'+weeklyPlanEditFields(day,entry)+'</div>'+
+      '</details>';
+    }
+    return '<article class="plan-calendar-day '+(active?'active':'rest')+' '+(day===today?'today':'')+'">'+head+'</article>';
+  }).join('');
+  const editPanel=weeklyPlanEditing
+    ? '<div class="plan-editor-panel">'+
+        '<details class="plan-subdrop">'+
+          '<summary><span>Jours de sport / semaine</span><strong>'+escapeHTML(planTitle)+'</strong></summary>'+
+          '<label class="plan-primary-select">Rythme<select data-action="plan-field" data-day="week" data-field="sportDays">'+weeklyPlanSportDaysOptions(weeklyPlan.sportDays)+'</select></label>'+
+          '<div class="setup-plan-days">'+selectedDays.map((day,index)=>'<div class="setup-plan-day-row"><label class="setup-plan-day"><span>Jour '+(index+1)+'</span><select data-action="plan-field" data-day="sport-'+index+'" data-field="sportDay">'+weeklyPlanDayOptions(day,selectedDays)+'</select></label><label class="setup-plan-day setup-plan-day-type"><span>Activité</span><select data-action="plan-field" data-day="'+day+'" data-field="type">'+weeklyPlanSportTypeOptions(weeklyPlanEntry(day).type)+'</select></label></div>').join('')+'</div>'+
+        '</details>'+
+      '</div>'
+    : '';
+  box.innerHTML=
+    '<section class="plan-summary-card">'+
+      '<span>Résumé du choix</span>'+
+      '<strong>'+escapeHTML(planTitle)+'</strong>'+
+      '<p>'+escapeHTML(levelLabel)+' · '+escapeHTML(equipmentSummaryText())+'</p>'+
+      '<div class="plan-summary-grid">'+
+        '<div><span>Séances</span><strong>'+load.workouts+'</strong></div>'+
+        '<div><span>Temps</span><strong>~'+load.minutes+' min</strong></div>'+
+        '<div><span>Aujourd’hui</span><strong>'+escapeHTML(WEEKLY_PLAN_TYPES[weeklyPlanEntry(today).type]||'Plan')+'</strong></div>'+
+      '</div>'+
+      '<button class="program-main-action" type="button" data-action="launch-plan-today">Lancer aujourd’hui</button>'+
+    '</section>'+
+    '<section class="plan-manager-card plan-calendar-card">'+
+      '<div class="plan-manager-head"><div><span>Calendrier semaine</span></div><button type="button" class="timer-secondary-btn" data-action="edit-plan">'+(weeklyPlanEditing?'Fermer':'Modifier')+'</button></div>'+
+      '<details class="plan-section-drop" '+(weeklyPlanEditing?'open':'')+'><summary><span>Voir</span><strong>'+load.workouts+' séance'+(load.workouts>1?'s':'')+' prévue'+(load.workouts>1?'s':'')+'</strong></summary><div class="plan-calendar-week">'+calendarPreview+'</div>'+editPanel+'</details>'+
+    '</section>'+
+    '<section class="plan-manager-card">'+
+      '<details class="plan-section-drop plan-save-drop">'+
+        '<summary><span>Plans</span><strong>Sauvegarder ou reprendre</strong></summary>'+
+        '<div class="plan-save-panel">'+
+          '<div class="plan-manager-actions">'+
+            '<button type="button" class="timer-secondary-btn" data-action="regenerate-plan">Refaire</button>'+
+            '<button type="button" class="start-btn plan-save-btn" data-action="save-plan">Sauvegarder</button>'+
+          '</div>'+
+          '<div class="plan-load-row">'+
+            '<label class="plan-load-select">Plan sauvegardé<select data-action="plan-field" data-day="week" data-field="selectSavedPlan">'+savedWeeklyPlanOptions()+'</select></label>'+
+            '<div class="plan-load-actions">'+
+              '<button type="button" class="timer-secondary-btn" data-action="load-selected-plan" '+(selectedSavedWeeklyPlanId?'':'disabled')+'>Charger</button>'+
+              '<button type="button" class="timer-secondary-btn danger-choice" data-action="delete-selected-plan" '+(canDeleteSavedPlan?'':'disabled')+'>Supprimer</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+      '</details>'+
+    '</section>';
+}
+
+function renderSetupPlan(){
+  const box=document.getElementById('setup-plan-content');
+  if(!box)return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const load=weeklyPlanLoadSummary();
+  const today=getRealDay();
+  const selectedDays=weeklyPlanSelectedSportDays();
+  const planSummary=(weeklyPlan.sportDays||selectedDays.length)+' jour'+((weeklyPlan.sportDays||selectedDays.length)>1?'s':'');
+  box.innerHTML=
+    '<section class="setup-plan-block">'+
+      '<details class="setup-dropdown setup-plan-dropdown">'+
+        '<summary><span>Plan de semaine</span><strong>'+planSummary+'</strong></summary>'+
+        '<div class="setup-plan-card">'+
+          '<div class="setup-plan-copy"><strong>Programme tes jours de sport</strong><span>Choisis ton rythme, puis ajuste rapidement les journées importantes.</span></div>'+
+          '<label class="plan-primary-select">Jours de sport / semaine<select data-action="plan-field" data-day="week" data-field="sportDays">'+weeklyPlanSportDaysOptions(weeklyPlan.sportDays)+'</select></label>'+
+          '<div class="setup-plan-metrics">'+
+            '<div><span>Séances</span><strong>'+load.workouts+'</strong></div>'+
+            '<div><span>Temps</span><strong>~'+load.minutes+' min</strong></div>'+
+            '<div><span>Aujourd’hui</span><strong>'+escapeHTML(WEEKLY_PLAN_TYPES[weeklyPlanEntry(today).type]||'Plan')+'</strong></div>'+
+          '</div>'+
+          '<div class="setup-plan-days">'+selectedDays.map((day,index)=>'<div class="setup-plan-day-row"><label class="setup-plan-day"><span>Jour '+(index+1)+'</span><select data-action="plan-field" data-day="sport-'+index+'" data-field="sportDay">'+weeklyPlanDayOptions(day,selectedDays)+'</select></label><label class="setup-plan-day setup-plan-day-type"><span>Activité</span><select data-action="plan-field" data-day="'+day+'" data-field="type">'+weeklyPlanSportTypeOptions(weeklyPlanEntry(day).type)+'</select></label></div>').join('')+'</div>'+
+        '</div>'+
+      '</details>'+
+      '<div class="setup-next-grid">'+
+        '<button type="button" class="choice-btn setup-next-card" data-action="save-profile-tab" data-tab="program"><strong>Programme</strong><span>Voir et lancer la séance prévue aujourd’hui.</span></button>'+
+        '<button type="button" class="choice-btn setup-next-card" data-action="save-profile-tab" data-tab="exercises"><strong>Exercices</strong><span>Explorer la bibliothèque et créer une séance.</span></button>'+
+      '</div>'+
+    '</section>';
+}
+
+function toggleWeeklyPlanEdit(){
+  weeklyPlanEditing=!weeklyPlanEditing;
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function applyWeeklyPlanTemplate(template){
+  weeklyPlan=defaultWeeklyPlan(template||'current');
+  saveWeeklyPlan();
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function regenerateWeeklyPlan(){
+  const count=Math.max(1,Math.min(6,Number(weeklyPlan&&weeklyPlan.sportDays)||3));
+  weeklyPlan=defaultWeeklyPlan(count===3?'3days':(count===4?'4days':'current'));
+  applyWeeklyPlanSelectedDays(planDaysForCount(count));
+  weeklyPlanEditing=true;
+  renderWeeklyPlan();
+}
+
+function updateWeeklyPlanDraft(day,field,value){
+  if(day==='week' && field==='sportDays'){
+    applyWeeklyPlanSportDays(Number(value)||3);
+    return;
+  }
+  if(day==='week' && field==='loadSavedPlan'){
+    if(value)loadWeeklyPlanSnapshot(value);
+    return;
+  }
+  if(day==='week' && field==='selectSavedPlan'){
+    selectedSavedWeeklyPlanId=value||'';
+    renderWeeklyPlan();
+    return;
+  }
+  if(field==='sportDay' && String(day||'').startsWith('sport-')){
+    updateWeeklyPlanSportDay(Number(String(day).replace('sport-','')),value);
+    return;
+  }
+  if(!DAYS.includes(day))return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const entry=weeklyPlan.days[day];
+  if(field==='duplicateFrom'){
+    if(DAYS.includes(value)){
+      weeklyPlan.days[day]={...weeklyPlanEntry(value)};
+      saveWeeklyPlan();
+      renderWeeklyPlan();
+      renderSetupPlan();
+    }
+    return;
+  }
+  entry[field]=value;
+  if(field==='type'){
+    if(value==='routine'&&!entry.routineDay)entry.routineDay=day;
+    if(value==='session'&&!entry.sessionId&&savedCustomSessions[0])entry.sessionId=savedCustomSessions[0].id||'0';
+    if(value==='exercise'&&!entry.exerciseKey){
+      const first=getExerciseLibraryItems()[0];
+      if(first)entry.exerciseKey=first.key||libraryItemKey(first);
+    }
+  }
+  saveWeeklyPlan();
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function updateWeeklyPlanRoutineField(day,field,value,options={}){
+  if(!DAYS.includes(day))return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const entry=weeklyPlan.days[day];
+  if(field==='customName')entry.customName=String(value||'').slice(0,36);
+  saveWeeklyPlan();
+  if(options.render===false)return;
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function renameWeeklyPlanRoutineExercise(day,key,value,options={}){
+  if(!DAYS.includes(day)||!key)return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const entry=weeklyPlan.days[day];
+  entry.customExerciseNames={...(entry.customExerciseNames||{})};
+  entry.customExerciseNames[key]=String(value||'').slice(0,42);
+  saveWeeklyPlan();
+  if(options.render===false)return;
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function addWeeklyPlanRoutineExercise(day,libraryIndex){
+  if(!DAYS.includes(day))return;
+  const item=getExerciseLibraryItems()[Number(libraryIndex)];
+  if(!item)return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const entry=weeklyPlan.days[day];
+  const key=item.key||libraryItemKey(item);
+  entry.type='routine';
+  entry.customKeys=Array.isArray(entry.customKeys)?entry.customKeys:[];
+  if(!entry.customKeys.includes(key))entry.customKeys.push(key);
+  entry.customExerciseNames={...(entry.customExerciseNames||{})};
+  if(!entry.customExerciseNames[key])entry.customExerciseNames[key]=item.ex.name;
+  saveWeeklyPlan();
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function removeWeeklyPlanRoutineExercise(day,index){
+  if(!DAYS.includes(day))return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const entry=weeklyPlan.days[day];
+  entry.customKeys=Array.isArray(entry.customKeys)?entry.customKeys:[];
+  const removed=entry.customKeys.splice(Number(index),1)[0];
+  if(removed&&entry.customExerciseNames)delete entry.customExerciseNames[removed];
+  saveWeeklyPlan();
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function moveWeeklyPlanRoutineExercise(day,index,dir){
+  if(!DAYS.includes(day)||!dir)return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const entry=weeklyPlan.days[day];
+  entry.customKeys=Array.isArray(entry.customKeys)?entry.customKeys:[];
+  const from=Number(index);
+  const to=from+Number(dir);
+  if(from<0||to<0||from>=entry.customKeys.length||to>=entry.customKeys.length)return;
+  const [item]=entry.customKeys.splice(from,1);
+  entry.customKeys.splice(to,0,item);
+  saveWeeklyPlan();
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function updateWeeklyPlanSportDay(index,value){
+  if(!DAYS.includes(value))return;
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const selected=weeklyPlanSelectedSportDays();
+  if(index<0||index>=selected.length)return;
+  selected[index]=value;
+  const unique=[];
+  selected.forEach(day=>{
+    if(DAYS.includes(day)&&!unique.includes(day))unique.push(day);
+  });
+  planDaysForCount(weeklyPlan.sportDays).forEach(day=>{
+    if(unique.length<weeklyPlan.sportDays&&!unique.includes(day))unique.push(day);
+  });
+  applyWeeklyPlanSelectedDays(unique.slice(0,weeklyPlan.sportDays));
+}
+
+function applyWeeklyPlanSelectedDays(selectedDays){
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const selected=selectedDays.filter((day,index,arr)=>DAYS.includes(day)&&arr.indexOf(day)===index).slice(0,6);
+  weeklyPlan.sportDays=Math.max(1,selected.length);
+  DAYS.forEach(day=>{
+    const previous=weeklyPlan.days[day]||{};
+    weeklyPlan.days[day]=selected.includes(day)
+      ? {...previous,type:previous.type&&previous.type!=='rest'?previous.type:'routine',routineDay:previous.routineDay||day}
+      : {...previous,type:'rest',routineDay:day};
+  });
+  saveWeeklyPlan();
+  renderWeeklyPlan();
+  renderSetupPlan();
+}
+
+function applyWeeklyPlanSportDays(count){
+  weeklyPlan=normalizeWeeklyPlan(weeklyPlan);
+  const desired=Math.max(1,Math.min(6,Number(count)||3));
+  const current=weeklyPlanSelectedSportDays().slice(0,desired);
+  planDaysForCount(desired).forEach(day=>{
+    if(current.length<desired&&!current.includes(day))current.push(day);
+  });
+  applyWeeklyPlanSelectedDays(current.slice(0,desired));
+}
+
+function openRoutineBuilderFromPlan(){
+  showTab('exercises');
+  setTimeout(()=>{
+    const builder=document.getElementById('custom-session-builder');
+    if(builder)builder.scrollIntoView({behavior:'smooth',block:'start'});
+  },0);
+}
+
+function saveWeeklyPlanFromUI(){
+  saveCurrentWeeklyPlanSnapshot();
+  weeklyPlanEditing=false;
+  renderWeeklyPlan();
+  renderSetupPlan();
+  saveAppState();
+}
+
+function launchPlannedToday(){
+  return launchPlannedDay(getRealDay());
+}
+
+function launchPlannedDay(day){
+  if(!DAYS.includes(day))return;
+  const entry=weeklyPlanEntry(day);
+  if(entry.type==='rest'){
+    currentDay=day;
+    storageSafe.setItem('vv-current-day',currentDay);
+    showTab('program');
+    showProgramView('today',{keepDay:true});
+    return;
+  }
+  if(entry.type==='routine'){
+    const sourceDay=DAYS.includes(entry.routineDay)?entry.routineDay:day;
+    const customSteps=weeklyPlanCustomRoutineSteps(day,entry);
+    const steps=(customSteps.length?customSteps:buildSessionSteps(sourceDay)).filter(step=>step.effort>0);
+    if(!steps.length)return;
+    currentDay=sourceDay;
+    storageSafe.setItem('vv-current-day',currentDay);
+    guidedSession={day:sourceDay,label:'Plan · '+weeklyPlanCustomRoutineName(day,entry),steps,index:0,startedAt:Date.now(),planned:true,custom:customSteps.length>0};
+    showTab('timer');
+    updateSessionRunner();
+    startGuidedStep(0);
+    saveAppState();
+    return;
+  }
+  if(entry.type==='session'){
+    const index=savedCustomSessions.findIndex((session,i)=>(session.id||String(i))===entry.sessionId);
+    if(index<0){showTab('exercises');return;}
+    startSavedCustomSession(index);
+    return;
+  }
+  if(entry.type==='exercise'){
+    const items=getExerciseLibraryItems();
+    const index=items.findIndex(item=>(item.key||libraryItemKey(item))===entry.exerciseKey);
+    if(index<0){showTab('exercises');return;}
+    startLibraryExercise(index);
+  }
+}function bindNavigationTabs(){
   document.querySelectorAll('[data-tab]').forEach(btn=>{
     if(btn.__vvNavBound)return;
     btn.__vvNavBound=true;
@@ -4095,15 +4648,16 @@ function bindNavigationTabs(){
 }
 
 function getTabPageNames(){
-  return ['program','exercises','timer','stats','options'];
+  return ['plan','program','exercises','timer','stats','options'];
 }
 
 const TAB_LABELS={
+  plan:'Plan',
   program:'Programme',
   exercises:'Exercices',
   timer:'Minuteur',
   stats:'Stats',
-  options:'Options'
+  options:'Profil'
 };
 
 function navigateTab(delta){
@@ -4128,8 +4682,8 @@ function renderHeaderNavControls(){
   const controls=document.createElement('div');
   controls.className='page-nav-controls';
   controls.innerHTML=
-    '<button class="page-nav-btn" type="button" onclick="navigateTab(-1)" aria-label="Page précédente : '+escapeHTML(TAB_LABELS[prev]||prev)+'">‹</button>'+
-    '<button class="page-nav-btn" type="button" onclick="navigateTab(1)" aria-label="Page suivante : '+escapeHTML(TAB_LABELS[next]||next)+'">›</button>';
+    '<button class="page-nav-btn" type="button" data-action="nav-tab" data-dir="-1" aria-label="Page précédente : '+escapeHTML(TAB_LABELS[prev]||prev)+'">‹</button>'+
+    '<button class="page-nav-btn" type="button" data-action="nav-tab" data-dir="1" aria-label="Page suivante : '+escapeHTML(TAB_LABELS[next]||next)+'">›</button>';
   header.appendChild(controls);
 }
 
@@ -4203,7 +4757,7 @@ function ensureStatsTab(){
     <div class="coach-card"><div class="coach-title">7 derniers jours</div><div class="chart" id="stats-chart"></div></div>
     <div class="coach-card"><div class="coach-title">Semaine actuelle</div><div id="stats-week"></div></div>
     <div class="section-label">Historique par jour</div><div class="history-list" id="history-list"></div>
-    <div class="stats-reset-footer"><button class="stats-reset-btn" type="button" onclick="resetStats()">Reset stats</button></div>`;
+    <div class="stats-reset-footer"><button class="stats-reset-btn" type="button" data-action="reset-stats">Reset stats</button></div>`;
   if(options)appScreen.insertBefore(el,options); else appScreen.insertBefore(el,appScreen.querySelector('.tab-bar'));
 }
 
@@ -4238,6 +4792,7 @@ function showTab(t){
     updateTimer();
     updateTimerDetails();
   }
+  if(currentTab==='plan' && typeof renderWeeklyPlan==='function')renderWeeklyPlan();
   if(currentTab==='stats' && typeof renderStats==='function')renderStats();
   if(currentTab==='options' && typeof renderOptions==='function')renderOptions();
   if(currentTab==='program')showProgramView(programView);
@@ -4364,7 +4919,7 @@ function playTone(freq=660,duration=0.14,delay=0,volume=0.18,type='sine'){
 function playChime(notes,baseVolume=0.16){
   if(!soundEnabled)return;
   notes.forEach((note,index)=>{
-    playTone(note.freq,note.duration||0.16,note.delay??(index*0.11),note.volume||baseVolume,note.type||'sine');
+    playTone(note.freq,note.duration||0.16,note.delay?index*0.11:0,note.volume||baseVolume,note.type||'sine');
   });
 }
 
@@ -4680,11 +5235,11 @@ function updateTimerDetails(){
 
   if(!ex){
     if(summary)summary.classList.add('hidden');
-    target.textContent='—';
-    sets.textContent='—';
+    target.textContent='–';
+    sets.textContent='–';
     how.textContent=isManualTimerMode()?'Choisis une durée, puis lance ton minuteur libre.':'Lance une séance depuis Aujourd’hui ou un exercice depuis Exercices pour voir les détails ici.';
     tips.textContent='';
-    if(effortEl)effortEl.textContent=timer.seconds?fmt(timer.seconds):'—';
+    if(effortEl)effortEl.textContent=timer.seconds?fmt(timer.seconds):'–';
     if(restEl)restEl.textContent=timer.rest?fmt(timer.rest):'Aucune';
     if(modeEl)modeEl.textContent=isManualTimerMode()?'Manuel':timerModeLabel();
     if(effortInfo)effortInfo.textContent=isManualTimerMode()?'Durée libre choisie pour ton chrono manuel.':'Aucun exercice lancé pour le moment.';
@@ -4700,7 +5255,7 @@ function updateTimerDetails(){
   const rest=currentStep ? currentStep.rest : (ex.rest || timer.rest || 0);
 
   target.textContent=ex.target || (currentStep ? currentStep.name : 'Exercice');
-  sets.textContent=ex.circuit ? 'Circuit · '+ex.circuit.length+' étapes' : (ex.sets || '—');
+  sets.textContent=ex.circuit ? 'Circuit · '+ex.circuit.length+' étapes' : (ex.sets || '–');
 
   if(currentStep){
     how.textContent='À faire maintenant : '+currentStep.name;
@@ -4915,153 +5470,36 @@ display.classList.toggle('running',timer.running);
   syncTimerButtons();
 }
 
-function startPrepCountdown(){
-  clearInterval(timer.interval);
-  const resumePrep=timer.pendingStart && timer.phase==='prep';
-  const originalLeft=resumePrep ? (timer.prepOriginalLeft || timer.seconds || timer.left) : timer.left;
-  const originalTotal=resumePrep ? (timer.prepOriginalTotal || timer.totalPhase || timer.seconds || timer.left) : (timer.totalPhase || timer.seconds || timer.left);
-  const returnPhase=resumePrep ? (timer.prepReturnPhase || 'effort') : (timer.phase || 'effort');
-  let prepLeft=resumePrep ? timer.left : timer.prep;
-
-  timer.pendingStart=true;
-  timer.running=true;
-  timer.phase='prep';
-  timer.prepOriginalLeft=originalLeft;
-  timer.prepOriginalTotal=originalTotal;
-  timer.prepReturnPhase=returnPhase;
-  timer.left=prepLeft;
-  timer.totalPhase=Math.max(1,timer.prep);
-  updateMainTimerButton();
-  document.getElementById('timer-phase').textContent='PRÉPARATION';
-  syncTimerLabels();
-  updateTimer();
-  cue('count');
-
-  timer.interval=setInterval(()=>{
-    prepLeft--;
-    timer.left=Math.max(0,prepLeft);
-    const progress=Math.round(((timer.prep-prepLeft)/Math.max(1,timer.prep))*100);
-    const ring=document.getElementById('timer-ring');
-    const fill=document.getElementById('timer-linear-fill');
-    const percent=document.getElementById('timer-percent');
-    const step=document.getElementById('timer-step');
-
-    if(ring)ring.style.setProperty('--timer-progress',progress+'%');
-    if(fill)fill.style.width=progress+'%';
-    if(percent)percent.textContent=progress+'%';
-    if(step)step.textContent='Décompte';
-
-    if(prepLeft>0){
-      if(prepLeft<=3)cue('count');
-      updateTimer();
-    }else{
-      clearInterval(timer.interval);
-      timer.pendingStart=false;
-      timer.phase=timer.prepReturnPhase || 'effort';
-      timer.left=originalLeft;
-      timer.totalPhase=originalTotal;
-      delete timer.prepOriginalLeft;
-      delete timer.prepOriginalTotal;
-      delete timer.prepReturnPhase;
-      syncTimerLabels();
-      document.getElementById('timer-phase').textContent='EFFORT';
-      startActiveTimer();
+function timerEngineHooks(){
+  return {
+    cue,
+    updateTimer,
+    syncTimerLabels,
+    updateMainTimerButton,
+    saveAppState,
+    advanceGuidedSession,
+    setPhaseText(text){
+      const el=document.getElementById('timer-phase');
+      if(el)el.textContent=text;
+    },
+    setContextText(text){
+      const el=document.getElementById('timer-context');
+      if(el)el.textContent=text;
     }
-  },1000);
+  };
+}
+
+function startPrepCountdown(){
+  return window.TimerShell.startPrepCountdown(timer,timerEngineHooks());
 }
 
 function startActiveTimer(){
-  timer.running=true;
-  cue('start');
-  timer.interval=setInterval(()=>{
-    timer.left--;
-    if(timer.left>0&&timer.left<=3)cue('count');
-    if(timer.left<=0){
-      clearInterval(timer.interval);
-      if(timer.phase==='effort'&&timer.rest>0){
-        cue('rest');
-        timer.phase='rest';syncTimerLabels();
-        timer.left=timer.rest;
-        timer.seconds=timer.rest;
-        timer.totalPhase=timer.rest;
-        document.getElementById('timer-phase').textContent='RÉCUPÉRATION';
-        timer.interval=setInterval(()=>{
-          timer.left--;
-          if(timer.left>0&&timer.left<=3)cue('count');
-          if(timer.left<=0){
-            clearInterval(timer.interval);
-            if(timer.circuit && timer.circuitIndex < timer.circuit.length-1){
-              timer.circuitIndex++;
-              const step=timer.circuit[timer.circuitIndex];
-              timer.exercise=step.name;syncTimerLabels();
-              timer.left=step.effort;
-              timer.seconds=step.effort;
-              timer.totalPhase=step.effort;
-              timer.rest=step.rest;
-              timer.phase='effort';syncTimerLabels();
-              document.getElementById('timer-context').textContent='Circuit · '+step.name;
-              document.getElementById('timer-phase').textContent='EFFORT';
-              timer.pendingStart=false;syncTimerLabels();
-              updateTimer();
-              if(timer.prep>0)startPrepCountdown(); else startActiveTimer();
-            }else{
-              if(timer.guided&&advanceGuidedSession()){
-                return;
-              }
-              timer.running=false;
-              document.getElementById('timer-phase').textContent='TERMINÉ';
-              cue('done');
-            }
-          }
-          updateTimer();
-        },1000);
-      }else{
-        if(timer.guided&&advanceGuidedSession()){
-          return;
-        }
-        timer.running=false;
-        document.getElementById('timer-phase').textContent='TERMINÉ';
-        cue('done');
-      }
-    }
-    updateTimer();
-  },1000);
-  updateTimer();
+  return window.TimerShell.startActiveTimer(timer,timerEngineHooks());
 }
 
 function toggleTimer(){
-  if(timer.running){
-    timer.running=false;
-    if(!timer.pendingStart)timer.pendingStart=false;
-    syncTimerLabels();
-    clearInterval(timer.interval);
-    updateTimer();
-    saveAppState();
-    return;
-  }
-
-  if(timer.left<=0){
-    timer.left=timer.seconds;
-    timer.totalPhase=timer.seconds;
-  }
-
-  if(timer.pendingStart && timer.prep>0){
-    startPrepCountdown();
-    return;
-  }
-
-  const shouldPrep = (timer.phase==='effort' || timer.phase==='manual') && timer.prep>0 && !timer.pendingStart;
-  if(shouldPrep){
-    startPrepCountdown();
-    return;
-  }
-
-  startActiveTimer();
-
-  syncTimerLabels();
-  if(typeof updateMainTimerButton==='function')updateMainTimerButton();
-}
-function registerServiceWorker(){
+  return window.TimerShell.toggleTimer(timer,timerEngineHooks());
+}function registerServiceWorker(){
   if(!('serviceWorker' in navigator))return;
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
@@ -5085,6 +5523,7 @@ function registerServiceWorker(){
   });
 }
 registerServiceWorker();
+initIntroScreen();
 boot();
 
 

@@ -17,7 +17,7 @@ node_modules/
 dist/
 build/
 .cache/
-build.js
+artifacts/
 *.min
 
 # Local environment files
