@@ -1,4 +1,4 @@
-const CACHE_NAME='vv-sport-exercises-profile-timer-v65-plan-edit-stays-open';
+const CACHE_NAME='vv-sport-exercises-profile-timer-v69-plan-added-count';
 const ASSETS=[
   './',
   './index.html',

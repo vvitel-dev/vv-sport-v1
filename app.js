@@ -4253,7 +4253,7 @@ function weeklyPlanEditFields(day,entry){
   const type=entry.type;
   const createSessionLink='<button type="button" class="plan-inline-action" data-action="create-plan-routine">Créer / programmer une séance</button>';
   const detail=type==='routine'
-    ? '<label>Base programme<select data-action="plan-field" data-day="'+day+'" data-field="routineDay">'+weeklyPlanRoutineOptions(entry.routineDay||day)+'</select></label>'+weeklyPlanRoutineBuilderHTML(day,entry)
+    ? '<label>Nouveau programme par défaut<select data-action="plan-field" data-day="'+day+'" data-field="routineDay">'+weeklyPlanRoutineOptions(entry.routineDay||day)+'</select></label>'+weeklyPlanRoutineBuilderHTML(day,entry)
     : (type==='session'
       ? '<label>Séance sauvegardée<select data-action="plan-field" data-day="'+day+'" data-field="sessionId">'+weeklyPlanSessionOptions(entry.sessionId)+'</select></label>'+createSessionLink
       : '<div class="plan-rest-note">Repos actif ou vraie coupure. Rien ne sera compté dans les exercices.</div>');
@@ -4300,7 +4300,7 @@ function weeklyPlanRoutineBuilderHTML(day,entry){
     '<div class="plan-routine-head"><span>Exercice libre</span><strong>'+selected.length+' exercice'+(selected.length>1?'s':'')+'</strong></div>'+
     selectedHTML+
     '<details class="plan-routine-shop">'+
-      '<summary><span>Ajouter des exercices</span><strong>Boutique</strong></summary>'+
+      '<summary><span>Ajouter des exercices</span><strong>'+selected.length+' ajouté'+(selected.length>1?'s':'')+'</strong></summary>'+
       shopHTML+
     '</details>'+
   '</div>';
